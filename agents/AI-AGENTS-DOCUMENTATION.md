@@ -625,4 +625,10 @@ MIT
 
 ---
 
+## Architecture Diagram
+
+![Port Flow AI Agents Architecture](diagram.png)
+
+---
+
 *Documentation generated for Port Flow AI Agents v1.0*

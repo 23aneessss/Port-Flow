@@ -188,3 +188,7 @@ See `ROUTES.md`, `API.md`, and `HowtoTestRoutes.md` for endpoint list and payloa
 - Booking cancellation and consumption workflow.
 - Reporting exports (CSV/PDF).
 - Webhooks or email/SMS notifications.
+
+## 14. System Architecture Diagram
+
+![System Architecture Diagram](diagram.png)
