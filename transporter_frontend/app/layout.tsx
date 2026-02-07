@@ -2,7 +2,6 @@ import React from "react"
 import type { Metadata, Viewport } from "next"
 import { Montserrat, Roboto_Condensed } from "next/font/google"
 import "./globals.css"
-import { AppShell } from "@/components/app-shell"
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -37,7 +36,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${montserrat.variable} ${robotoCondensed.variable}`}>
       <body className="font-body antialiased">
-        <AppShell>{children}</AppShell>
+        {children}
       </body>
     </html>
   )

@@ -1,41 +1,42 @@
 'use client'
 
-import { alerts } from '@/lib/mock-data'
+import { useState, useEffect } from 'react'
 import { Layout } from '@/components/layout'
-import { AlertCircle, AlertTriangle, Info, Bell } from 'lucide-react'
+import { listAnomalies, type Anomaly } from '@/lib/api'
+import { AlertCircle, AlertTriangle, Info, Bell, Loader2 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
-interface AlertWithTimestamp {
-  icon: any
-  bgColor: string
-  borderColor: string
-  textColor: string
-}
-
-const AlertType = {
-  critical: 'critical',
-  warning: 'warning',
-  info: 'info',
-  default: 'default',
+function severityToType(severity: string): 'critical' | 'warning' | 'info' {
+  switch (severity?.toUpperCase()) {
+    case 'CRITICAL': return 'critical'
+    case 'WARNING': return 'warning'
+    default: return 'info'
+  }
 }
 
 export default function AlertsPage() {
+  const [anomalies, setAnomalies] = useState<Anomaly[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    listAnomalies()
+      .then(setAnomalies)
+      .catch(() => {})
+      .finally(() => setIsLoading(false))
+  }, [])
+
   const getAlertIcon = (type: string) => {
     switch (type) {
-      case AlertType.critical:
-        return AlertCircle
-      case AlertType.warning:
-        return AlertTriangle
-      case AlertType.info:
-        return Info
-      default:
-        return Bell
+      case 'critical': return AlertCircle
+      case 'warning': return AlertTriangle
+      case 'info': return Info
+      default: return Bell
     }
   }
 
   const getAlertStyles = (type: string) => {
     switch (type) {
-      case AlertType.critical:
+      case 'critical':
         return {
           bg: 'bg-red-50',
           border: 'ring-1 ring-red-200',
@@ -43,7 +44,7 @@ export default function AlertsPage() {
           badge: 'bg-red-100 text-red-700 ring-1 ring-red-200',
           icon: 'bg-red-100 text-red-500',
         }
-      case AlertType.warning:
+      case 'warning':
         return {
           bg: 'bg-amber-50',
           border: 'ring-1 ring-amber-200',
@@ -51,7 +52,7 @@ export default function AlertsPage() {
           badge: 'bg-amber-100 text-amber-700 ring-1 ring-amber-200',
           icon: 'bg-amber-100 text-amber-500',
         }
-      case AlertType.info:
+      case 'info':
         return {
           bg: 'bg-sky-50',
           border: 'ring-1 ring-sky-200',
@@ -70,14 +71,32 @@ export default function AlertsPage() {
     }
   }
 
-  const sortedAlerts = [...alerts].sort(
+  const alertItems = anomalies.map(a => ({
+    id: a.id,
+    type: severityToType(a.severity),
+    message: a.message,
+    timestamp: a.createdAt,
+    related_terminal: a.terminal?.name || null,
+  }))
+
+  const sortedAlerts = [...alertItems].sort(
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   )
 
   const alertCounts = {
-    critical: alerts.filter((a) => a.type === AlertType.critical).length,
-    warning: alerts.filter((a) => a.type === AlertType.warning).length,
-    info: alerts.filter((a) => a.type === AlertType.info).length,
+    critical: alertItems.filter(a => a.type === 'critical').length,
+    warning: alertItems.filter(a => a.type === 'warning').length,
+    info: alertItems.filter(a => a.type === 'info').length,
+  }
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </Layout>
+    )
   }
 
   return (
@@ -130,9 +149,6 @@ export default function AlertsPage() {
                     <div className="flex-1">
                       <div className="flex items-start justify-between">
                         <div>
-                          <h3 className={`font-bold ${styles.text}`}>
-                            {alert.title}
-                          </h3>
                           <p className={`mt-1 text-sm font-condensed ${styles.text} opacity-80`}>
                             {alert.message}
                           </p>
@@ -145,8 +161,7 @@ export default function AlertsPage() {
                               alert.type === 'warning' ? 'bg-amber-500' :
                               'bg-sky-500'
                             }`} />
-                            {alert.type.charAt(0).toUpperCase() +
-                              alert.type.slice(1)}
+                            {alert.type.charAt(0).toUpperCase() + alert.type.slice(1)}
                           </span>
                           <span className="text-xs text-muted-foreground font-condensed">
                             {formatDistanceToNow(
@@ -157,18 +172,11 @@ export default function AlertsPage() {
                         </div>
                       </div>
 
-                      {(alert.related_terminal || alert.related_booking) && (
+                      {alert.related_terminal && (
                         <div className="mt-3 flex gap-2">
-                          {alert.related_terminal && (
-                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
-                              Terminal: {alert.related_terminal}
-                            </span>
-                          )}
-                          {alert.related_booking && (
-                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
-                              Booking: {alert.related_booking}
-                            </span>
-                          )}
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
+                            Terminal: {alert.related_terminal}
+                          </span>
                         </div>
                       )}
                     </div>

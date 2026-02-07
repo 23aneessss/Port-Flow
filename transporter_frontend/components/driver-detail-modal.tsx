@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Pencil, Trash2, CheckCircle2, XCircle } from "lucide-react"
+import { Pencil, Trash2 } from "lucide-react"
 import type { Driver } from "@/lib/data"
 
 interface DriverDetailModalProps {
@@ -49,8 +49,14 @@ export function DriverDetailModal({
               Full Name
             </span>
             <span className="text-sm font-semibold text-card-foreground">
-              {driver.fullName}
+              {driver.firstName} {driver.lastName}
             </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-muted-foreground">
+              Email
+            </span>
+            <span className="text-sm text-card-foreground">{driver.user?.email}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-muted-foreground">
@@ -60,19 +66,33 @@ export function DriverDetailModal({
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-muted-foreground">
+              Gender
+            </span>
+            <span className="text-sm text-card-foreground">{driver.gender}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-muted-foreground">
+              Date of Birth
+            </span>
+            <span className="text-sm text-card-foreground">
+              {new Date(driver.birthDate).toLocaleDateString()}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-muted-foreground">
               Status
             </span>
             <Badge
               className={
-                driver.status === "Active"
+                driver.status === "ACTIVE"
                   ? "bg-emerald-50 text-emerald-600 border border-emerald-200/60 hover:bg-emerald-50"
                   : "bg-red-50 text-red-500 border border-red-200/60 hover:bg-red-50"
               }
             >
               <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${
-                driver.status === "Active" ? "bg-emerald-500" : "bg-red-400"
+                driver.status === "ACTIVE" ? "bg-emerald-500" : "bg-red-400"
               }`} />
-              {driver.status}
+              {driver.status === "ACTIVE" ? "Active" : "Suspended"}
             </Badge>
           </div>
           <div className="flex items-center justify-between">
@@ -83,30 +103,22 @@ export function DriverDetailModal({
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-muted-foreground">
-              Plate Number
+              Truck Plate
             </span>
-            <span className="text-sm text-card-foreground">{driver.plateNumber}</span>
+            <span className="text-sm text-card-foreground">{driver.truckPlate}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-muted-foreground">
-              License Number
+              Driving License
             </span>
-            <span className="text-sm text-card-foreground">{driver.licenseNumber}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">
-              License Verified
-            </span>
-            <div className="flex items-center gap-1.5">
-              {driver.licenseVerified ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-              ) : (
-                <XCircle className="h-4 w-4 text-red-400" />
-              )}
-              <span className="text-sm text-card-foreground">
-                {driver.licenseVerified ? "Verified" : "Not Verified"}
-              </span>
-            </div>
+            <a
+              href={driver.drivingLicenseUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-primary hover:underline"
+            >
+              View Document
+            </a>
           </div>
 
           <div className="mt-2 flex gap-2 justify-end">
@@ -125,7 +137,7 @@ export function DriverDetailModal({
               variant="destructive"
               size="sm"
               onClick={() => {
-                onDelete(driver.id)
+                onDelete(driver.userId)
                 onClose()
               }}
             >

@@ -1,12 +1,6 @@
 import { create } from "zustand"
-import type {
-  Driver,
-  Booking,
-  DriverStatus,
-  BookingStatus,
-  OperationType,
-} from "./data"
-import { initialDrivers, initialBookings } from "./data"
+import type { Driver, Booking, DriverStatus, BookingStatus, TerminalOption } from "./data"
+import * as api from "./api"
 
 export interface UserProfile {
   name: string
@@ -19,66 +13,115 @@ export interface UserProfile {
 interface AppStore {
   drivers: Driver[]
   bookings: Booking[]
+  terminals: TerminalOption[]
   profile: UserProfile
-  addDriver: (driver: Omit<Driver, "id">) => void
-  updateDriver: (id: string, driver: Partial<Driver>) => void
-  deleteDriver: (id: string) => void
-  addBooking: (booking: Omit<Booking, "id">) => void
-  updateBooking: (id: string, booking: Partial<Booking>) => void
-  deleteBooking: (id: string) => void
+  isLoadingDrivers: boolean
+  isLoadingBookings: boolean
+  isLoadingTerminals: boolean
+
+  fetchDrivers: () => Promise<void>
+  fetchBookings: () => Promise<void>
+  fetchTerminals: () => Promise<void>
+  addDriver: (data: {
+    email: string
+    password: string
+    firstName: string
+    lastName: string
+    phone: string
+    gender: string
+    birthDate: string
+    truckNumber: string
+    truckPlate: string
+    drivingLicenseUrl: string
+  }) => Promise<void>
+  updateDriver: (id: string, data: Partial<Driver>) => Promise<void>
+  deleteDriver: (id: string) => Promise<void>
+  addBooking: (data: {
+    terminalId: string
+    date: string
+    startTime: string
+    endTime: string
+    driverUserId?: string
+  }) => Promise<void>
+  updateBooking: (id: string, data: Partial<Booking>) => Promise<void>
+  deleteBooking: (id: string) => Promise<void>
   updateProfile: (profile: Partial<UserProfile>) => void
 }
 
-export const useAppStore = create<AppStore>((set) => ({
-  drivers: initialDrivers,
-  bookings: initialBookings,
+export const useAppStore = create<AppStore>((set, get) => ({
+  drivers: [],
+  bookings: [],
+  terminals: [],
+  isLoadingDrivers: false,
+  isLoadingBookings: false,
+  isLoadingTerminals: false,
   profile: {
-    name: "Moham Roudj",
-    email: "om_roudj@esi.dz",
-    phone: "+213 555 123 456",
+    name: "",
+    email: "",
+    phone: "",
     role: "Transporteur",
     avatarUrl: null,
   },
 
-  addDriver: (driver) =>
-    set((state) => ({
-      drivers: [
-        ...state.drivers,
-        { ...driver, id: `d${Date.now()}` },
-      ],
-    })),
+  fetchDrivers: async () => {
+    set({ isLoadingDrivers: true })
+    try {
+      const drivers = await api.listDrivers()
+      set({ drivers, isLoadingDrivers: false })
+    } catch {
+      set({ isLoadingDrivers: false })
+    }
+  },
 
-  updateDriver: (id, updates) =>
-    set((state) => ({
-      drivers: state.drivers.map((d) =>
-        d.id === id ? { ...d, ...updates } : d
-      ),
-    })),
+  fetchBookings: async () => {
+    set({ isLoadingBookings: true })
+    try {
+      const bookings = await api.listBookings()
+      set({ bookings, isLoadingBookings: false })
+    } catch {
+      set({ isLoadingBookings: false })
+    }
+  },
 
-  deleteDriver: (id) =>
-    set((state) => ({
-      drivers: state.drivers.filter((d) => d.id !== id),
-    })),
+  fetchTerminals: async () => {
+    set({ isLoadingTerminals: true })
+    try {
+      const terminals = await api.listTerminals()
+      set({ terminals, isLoadingTerminals: false })
+    } catch {
+      set({ isLoadingTerminals: false })
+    }
+  },
 
-  addBooking: (booking) =>
-    set((state) => ({
-      bookings: [
-        ...state.bookings,
-        { ...booking, id: `b${Date.now()}` },
-      ],
-    })),
+  addDriver: async (data) => {
+    await api.createDriver(data)
+    await get().fetchDrivers()
+  },
 
-  updateBooking: (id, updates) =>
-    set((state) => ({
-      bookings: state.bookings.map((b) =>
-        b.id === id ? { ...b, ...updates } : b
-      ),
-    })),
+  updateDriver: async (id, updates) => {
+    await api.updateDriver(id, updates)
+    await get().fetchDrivers()
+  },
 
-  deleteBooking: (id) =>
-    set((state) => ({
-      bookings: state.bookings.filter((b) => b.id !== id),
-    })),
+  deleteDriver: async (id) => {
+    await api.deleteDriver(id)
+    await get().fetchDrivers()
+  },
+
+  addBooking: async (data) => {
+    await api.createBooking(data)
+    await get().fetchBookings()
+  },
+
+  updateBooking: async (id, updates) => {
+    await api.updateBooking(id, updates)
+    await get().fetchBookings()
+  },
+
+  deleteBooking: async (id) => {
+    await api.deleteBooking(id)
+    await get().fetchBookings()
+  },
 
   updateProfile: (updates) =>
     set((state) => ({
@@ -86,4 +129,4 @@ export const useAppStore = create<AppStore>((set) => ({
     })),
 }))
 
-export type { Driver, Booking, DriverStatus, BookingStatus, OperationType }
+export type { Driver, Booking, DriverStatus, BookingStatus, TerminalOption }
