@@ -1,9 +1,9 @@
-import * as readline from 'readline';
+// Load environment variables FIRST before any other imports
 import { config } from 'dotenv';
-import { SlotAvailabilityAgent, hasAccess, type UserRole } from './index.js';
-
-// Load environment variables
 config();
+
+import * as readline from 'readline';
+import { SlotAvailabilityAgent, hasAccess, type UserRole } from './index.js';
 
 const ROLES: UserRole[] = ['ADMIN', 'OPERATOR', 'CARRIER', 'DRIVER'];
 

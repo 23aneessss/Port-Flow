@@ -299,3 +299,20 @@ export function createSlotAvailabilityAgent(
 ): SlotAvailabilityAgent {
   return new SlotAvailabilityAgent(options);
 }
+
+/**
+ * Factory function to create and initialize a new Slot Availability Agent
+ * This handles auto-login automatically if configured
+ */
+export async function createAndInitializeAgent(
+  options: SlotAvailabilityAgentOptions = {}
+): Promise<{ agent: SlotAvailabilityAgent; error?: string }> {
+  const agent = new SlotAvailabilityAgent(options);
+  const initResult = await agent.initialize();
+  
+  if (!initResult.success) {
+    return { agent, error: initResult.error };
+  }
+  
+  return { agent };
+}

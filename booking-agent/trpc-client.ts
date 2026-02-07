@@ -1,61 +1,84 @@
 /**
- * tRPC Client for the Booking Agent
+ * Booking Agent Client
  * 
- * This file can be copied to your frontend projects to connect to the tRPC API.
+ * NOTE: The Booking Agent is now orchestrated through the Orchestration Agent.
+ * For frontend integration, use the Orchestration Agent which coordinates
+ * both Booking and Slots Availability agents through a unified 6-step pipeline.
+ * 
+ * This file provides direct access to the BookingAgent class for advanced use cases.
  */
-import { createTRPCClient, httpBatchLink } from '@trpc/client';
-import type { AppRouter } from '../backend-express/src/trpc/index.js';
+
+import { BookingAgent, createBookingAgent, type BookingAgentOptions } from './src/index.js';
+
+// Re-export the agent for direct usage
+export { BookingAgent, createBookingAgent, type BookingAgentOptions };
 
 /**
- * Create a tRPC client for the booking agent
+ * Create a booking agent instance with configuration
  */
-export function createAgentClient(options: {
-  baseUrl?: string;
-  getAuthToken: () => string | null;
+export function createBookingAgentClient(options: {
+  apiBaseUrl?: string;
+  authToken?: string;
+  mistralApiKey: string;
 }) {
-  const { baseUrl = 'http://localhost:4000', getAuthToken } = options;
-
-  return createTRPCClient<AppRouter>({
-    links: [
-      httpBatchLink({
-        url: `${baseUrl}/trpc`,
-        headers: () => {
-          const token = getAuthToken();
-          return token ? { Authorization: `Bearer ${token}` } : {};
-        },
-      }),
-    ],
+  return createBookingAgent({
+    config: {
+      apiBaseUrl: options.apiBaseUrl || 'http://localhost:4000',
+      mistralApiKey: options.mistralApiKey,
+    },
+    authToken: options.authToken,
   });
 }
 
-// ============ Example Usage ============
+// ============ Recommended: Use Orchestration Agent ============
 /*
-import { createAgentClient } from './trpc-client';
+The Booking Agent is now part of a multi-agent orchestration system.
+For frontend integration, use the Orchestration Agent instead:
 
-// Create client with auth token
-const client = createAgentClient({
-  baseUrl: 'http://localhost:4000',
-  getAuthToken: () => localStorage.getItem('token'),
+import { createOrchestrator } from '../orchestration-agent/src/index.js';
+
+const orchestrator = createOrchestrator({
+  config: {
+    apiBaseUrl: 'http://localhost:4000',
+    mistralApiKey: process.env.MISTRAL_API_KEY,
+    autoLogin: {
+      email: 'user@example.com',
+      password: 'password',
+    },
+  },
+  userRole: 'CARRIER',
 });
 
-// Send a message to the agent
-const response = await client.agent.chat.mutate({
+await orchestrator.initialize();
+
+// The orchestrator automatically routes to the correct agent
+const response = await orchestrator.process({
   message: 'Show me all pending bookings',
-  sessionId: 'optional-session-id', // Pass same ID to continue conversation
+  userRole: 'CARRIER',
 });
 
-console.log(response.text);
-console.log(response.sessionId); // Save this to continue the conversation
-console.log(response.toolCalls); // See what tools the agent used
+console.log(response.output); // Role-appropriate formatted response
 
-// Clear a session
-await client.agent.clearSession.mutate({ sessionId: 'session-id' });
-
-// Get conversation history
-const history = await client.agent.getHistory.query({ sessionId: 'session-id' });
-
-// Get active sessions
-const sessions = await client.agent.getActiveSessions.query();
+// Or use the simple chat interface
+const reply = await orchestrator.chat('Create a booking at Terminal A tomorrow');
+console.log(reply);
 */
 
-export type { AppRouter };
+// ============ Direct Agent Usage (Advanced) ============
+/*
+import { createBookingAgentClient } from './trpc-client';
+
+const agent = createBookingAgentClient({
+  apiBaseUrl: 'http://localhost:4000',
+  authToken: 'your-jwt-token',
+  mistralApiKey: process.env.MISTRAL_API_KEY!,
+});
+
+// Direct chat with the booking agent
+const response = await agent.chat('Show me all pending bookings');
+console.log(response.text);
+console.log(response.toolCalls); // See what tools the agent used
+
+// Clear conversation history
+agent.clearHistory();
+*/

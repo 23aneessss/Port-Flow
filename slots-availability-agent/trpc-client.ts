@@ -1,68 +1,123 @@
 /**
- * tRPC Client for the Slots Availability Agent
+ * Slots Availability Agent Client
  * 
- * This file can be copied to your frontend projects to connect to the tRPC API.
+ * NOTE: The Slots Availability Agent is now orchestrated through the Orchestration Agent.
+ * For frontend integration, use the Orchestration Agent which coordinates
+ * both Booking and Slots Availability agents through a unified 6-step pipeline.
+ * 
+ * This file provides direct access to the SlotAvailabilityAgent class for advanced use cases.
  */
-import { createTRPCClient, httpBatchLink } from '@trpc/client';
-import type { AppRouter } from '../backend-express/src/trpc/index.js';
+
+import {
+  SlotAvailabilityAgent,
+  createSlotAvailabilityAgent,
+  createAndInitializeAgent,
+  type SlotAvailabilityAgentOptions,
+  type UserRole,
+} from './src/index.js';
+
+// Re-export the agent for direct usage
+export {
+  SlotAvailabilityAgent,
+  createSlotAvailabilityAgent,
+  createAndInitializeAgent,
+  type SlotAvailabilityAgentOptions,
+  type UserRole,
+};
 
 /**
- * Create a tRPC client for the slots availability agent
+ * Create a slots availability agent instance with configuration
  */
 export function createSlotsAgentClient(options: {
-  baseUrl?: string;
-  getAuthToken: () => string | null;
+  apiBaseUrl?: string;
+  authToken?: string;
+  mistralApiKey: string;
+  userRole?: UserRole;
+  autoLogin?: { email: string; password: string };
 }) {
-  const { baseUrl = 'http://localhost:4000', getAuthToken } = options;
-
-  return createTRPCClient<AppRouter>({
-    links: [
-      httpBatchLink({
-        url: `${baseUrl}/trpc`,
-        headers: () => {
-          const token = getAuthToken();
-          return token ? { Authorization: `Bearer ${token}` } : {};
-        },
-      }),
-    ],
+  return createSlotAvailabilityAgent({
+    config: {
+      apiBaseUrl: options.apiBaseUrl || 'http://localhost:4000',
+      mistralApiKey: options.mistralApiKey,
+      userRole: options.userRole,
+      autoLogin: options.autoLogin,
+    },
+    authToken: options.authToken,
+    userRole: options.userRole,
   });
 }
 
-// ============ Example Usage ============
+// ============ Recommended: Use Orchestration Agent ============
 /*
-import { createSlotsAgentClient } from './trpc-client';
+The Slots Availability Agent is now part of a multi-agent orchestration system.
+For frontend integration, use the Orchestration Agent instead:
 
-// Create client with auth token
-const client = createSlotsAgentClient({
-  baseUrl: 'http://localhost:4000',
-  getAuthToken: () => localStorage.getItem('token'),
+import { createOrchestrator } from '../orchestration-agent/src/index.js';
+
+const orchestrator = createOrchestrator({
+  config: {
+    apiBaseUrl: 'http://localhost:4000',
+    mistralApiKey: process.env.MISTRAL_API_KEY,
+    autoLogin: {
+      email: 'user@example.com',
+      password: 'password',
+    },
+  },
+  userRole: 'CARRIER',
 });
 
-// Send a message to the slots availability agent
-const response = await client.slotsAgent.chat.mutate({
-  message: 'What is the current availability at Terminal A?',
-  sessionId: 'optional-session-id', // Pass same ID to continue conversation
+await orchestrator.initialize();
+
+// The orchestrator automatically routes slot queries to the slots agent
+const response = await orchestrator.process({
+  message: 'What slots are available at Terminal A?',
+  userRole: 'CARRIER',
 });
 
+console.log(response.output); // Role-appropriate formatted response
+
+// The orchestrator handles:
+// - Input sanitization (prompt injection protection)
+// - Intent classification (bookings vs slots_availability)
+// - Task decomposition and execution
+// - Role-based output synthesis
+// - Confidentiality validation
+*/
+
+// ============ Direct Agent Usage (Advanced) ============
+/*
+import { createSlotsAgentClient, createAndInitializeAgent } from './trpc-client';
+
+// Option 1: Manual initialization
+const agent = createSlotsAgentClient({
+  apiBaseUrl: 'http://localhost:4000',
+  authToken: 'your-jwt-token',
+  mistralApiKey: process.env.MISTRAL_API_KEY!,
+  userRole: 'CARRIER',
+});
+
+// Option 2: Auto-initialize with login
+const agent = await createAndInitializeAgent({
+  config: {
+    apiBaseUrl: 'http://localhost:4000',
+    mistralApiKey: process.env.MISTRAL_API_KEY!,
+    autoLogin: { email: 'user@example.com', password: 'password' },
+  },
+  userRole: 'CARRIER',
+});
+
+// Direct chat with the slots agent
+const response = await agent.chat('What is the current availability at Terminal A?');
 console.log(response.text);
-console.log(response.sessionId); // Save this to continue the conversation
 console.log(response.toolCalls); // See what tools the agent used
 
-// Clear a session
-await client.slotsAgent.clearSession.mutate({ sessionId: 'session-id' });
-
-// Get conversation history
-const history = await client.slotsAgent.getHistory.query({ sessionId: 'session-id' });
-
-// Get active sessions
-const sessions = await client.slotsAgent.getActiveSessions.query();
-
-// Example queries for the Slots Availability Agent:
+// Example queries:
 // - "Show me all terminals with low utilization"
 // - "What are the peak hours at Terminal B?"
 // - "Find available slots for tomorrow morning"
 // - "What equipment constraints affect Terminal A?"
 // - "Recommend the best time to book a slot"
-*/
 
-export type { AppRouter };
+// Clear conversation history
+agent.clearHistory();
+*/

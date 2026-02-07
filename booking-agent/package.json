@@ -3,7 +3,13 @@
   "version": "1.0.0",
   "description": "AI Booking Agent using Vercel AI SDK for Port Flow",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "types": "./src/index.ts"
+    }
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",

@@ -2,6 +2,7 @@
 export {
   SlotAvailabilityAgent,
   createSlotAvailabilityAgent,
+  createAndInitializeAgent,
   type SlotAvailabilityAgentOptions,
   type AgentResponse,
 } from './agent.js';
@@ -16,6 +17,6 @@ export {
 
 export { createSlotAvailabilityTools, type SlotAvailabilityTools } from './tools.js';
 
-export { ApiClient, type ApiResponse, type HttpMethod } from './api-client.js';
+export { ApiClient, type ApiResponse, type HttpMethod, type LoginResponse } from './api-client.js';
 
 export * from './schemas.js';
