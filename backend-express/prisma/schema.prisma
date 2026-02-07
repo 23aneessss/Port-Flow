@@ -1,0 +1,224 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  OPERATOR
+  CARRIER
+  DRIVER
+}
+
+enum TerminalStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum CarrierStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum DriverStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  CANCELLED
+  CONSUMED
+}
+
+enum NotificationType {
+  BOOKING_CONFIRMED
+  QR_READY
+  GENERIC
+}
+
+enum ChatSender {
+  USER
+  ASSISTANT
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  operatorProfile OperatorProfile?
+  carrierProfile  CarrierProfile?
+  driverProfile   DriverProfile?
+
+  carrierBookings Booking[] @relation("CarrierBookings")
+  driverBookings  Booking[] @relation("DriverBookings")
+  decidedBookings Booking[] @relation("DecidedBookings")
+
+  notifications Notification[]
+  auditLogs      AuditLog[]
+
+  chatSessions ChatSession[]
+
+  carrierDrivers DriverProfile[] @relation("CarrierDrivers")
+
+  @@index([role])
+}
+
+model Terminal {
+  id             String   @id @default(uuid()) @db.Uuid
+  name           String
+  status         TerminalStatus @default(ACTIVE)
+  maxSlots       Int      @map("max_slots")
+  availableSlots Int      @map("available_slots")
+  coordX         Float    @map("coord_x")
+  coordY         Float    @map("coord_y")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  bookings         Booking[]
+  anomalies        Anomaly[]
+}
+
+model OperatorProfile {
+  userId     String   @id @map("user_id") @db.Uuid
+  firstName  String   @map("first_name")
+  lastName   String   @map("last_name")
+  phone      String
+  gender     String
+  birthDate  DateTime @map("birth_date")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user     User     @relation(fields: [userId], references: [id])
+}
+
+model CarrierProfile {
+  userId           String   @id @map("user_id") @db.Uuid
+  firstName        String   @map("first_name")
+  lastName         String   @map("last_name")
+  phone            String
+  gender           String
+  birthDate        DateTime @map("birth_date")
+  companyName      String   @map("company_name")
+  status           CarrierStatus @default(PENDING)
+  proofDocumentUrl String   @map("proof_document_url")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user   User @relation(fields: [userId], references: [id])
+}
+
+model DriverProfile {
+  userId           String   @id @map("user_id") @db.Uuid
+  carrierUserId    String   @map("carrier_user_id") @db.Uuid
+  firstName        String   @map("first_name")
+  lastName         String   @map("last_name")
+  phone            String
+  gender           String
+  birthDate        DateTime @map("birth_date")
+  truckNumber      String   @map("truck_number")
+  truckPlate       String   @map("truck_plate")
+  drivingLicenseUrl String  @map("driving_license_url")
+  status           DriverStatus @default(ACTIVE)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user    User   @relation(fields: [userId], references: [id])
+  carrier User   @relation("CarrierDrivers", fields: [carrierUserId], references: [id])
+}
+
+model Booking {
+  id        String   @id @default(uuid()) @db.Uuid
+  carrierUserId String @map("carrier_user_id") @db.Uuid
+  driverUserId  String? @map("driver_user_id") @db.Uuid
+  terminalId    String @map("terminal_id") @db.Uuid
+  date          DateTime
+  startTime     DateTime @map("start_time")
+  endTime       DateTime @map("end_time")
+  status        BookingStatus @default(PENDING)
+  decidedByOperatorUserId String? @map("decided_by_operator_user_id") @db.Uuid
+  qrPayload     String? @map("qr_payload")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  carrier User @relation("CarrierBookings", fields: [carrierUserId], references: [id])
+  driver  User? @relation("DriverBookings", fields: [driverUserId], references: [id])
+  terminal Terminal @relation(fields: [terminalId], references: [id])
+  decidedByOperator User? @relation("DecidedBookings", fields: [decidedByOperatorUserId], references: [id])
+
+  notifications Notification[]
+  anomalies     Anomaly[]
+
+  @@index([status])
+  @@index([date])
+  @@index([terminalId])
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  type      NotificationType
+  message   String
+  relatedBookingId String? @map("related_booking_id") @db.Uuid
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User @relation(fields: [userId], references: [id])
+  booking Booking? @relation(fields: [relatedBookingId], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  actorUserId String? @map("actor_user_id") @db.Uuid
+  action    String
+  entityType String @map("entity_type")
+  entityId  String? @map("entity_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  actor User? @relation(fields: [actorUserId], references: [id])
+}
+
+model Anomaly {
+  id        String   @id @default(uuid()) @db.Uuid
+  severity  String
+  message   String
+  terminalId String? @map("terminal_id") @db.Uuid
+  bookingId  String? @map("booking_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  terminal Terminal? @relation(fields: [terminalId], references: [id])
+  booking  Booking? @relation(fields: [bookingId], references: [id])
+}
+
+model ChatSession {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user     User @relation(fields: [userId], references: [id])
+  messages ChatMessage[]
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  sessionId String   @map("session_id") @db.Uuid
+  sender    ChatSender
+  content   String
+  intent    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  session ChatSession @relation(fields: [sessionId], references: [id])
+}

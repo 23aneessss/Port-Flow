@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════
+   TBMS – Truck Booking Management System
+   Charte graphique : maritime industriel
+   ═══════════════════════════════════════════════════ */
+
+:root {
+  /* Palette primaire */
+  --port-dark: #0F172A;
+  --port-cyan: #38BDF8;
+  --port-gray: #64748B;
+  --port-light: #F8FAFC;
+
+  /* Sémantique */
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+  --accent: #38BDF8;
+  --muted: #64748B;
+  --success: #22C55E;
+  --error: #EF4444;
+  --warning: #F59E0B;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-muted: var(--muted);
+  --color-port-dark: var(--port-dark);
+  --color-port-cyan: var(--port-cyan);
+  --color-port-gray: var(--port-gray);
+  --color-port-light: var(--port-light);
+  --color-success: var(--success);
+  --color-error: var(--error);
+  --color-warning: var(--warning);
+  --font-heading: var(--font-montserrat);
+  --font-body: var(--font-roboto-condensed);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-roboto-condensed), 'Roboto Condensed', sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-montserrat), 'Montserrat', sans-serif;
+}
+
+/* Focus ring utilitaire */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-port-cyan/50 focus:ring-offset-2 focus:ring-offset-port-dark;
+}
+
+/* Scrollbar sobre */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #1E293B;
+}
+::-webkit-scrollbar-thumb {
+  background: #38BDF8;
+  border-radius: 3px;
+}
