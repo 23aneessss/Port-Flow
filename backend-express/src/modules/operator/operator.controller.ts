@@ -1,6 +1,14 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../../middlewares/auth.js';
-import { approveBooking, listBookingsForOperator, rejectBooking, listCarrierBookingsForOperator } from './operator.service.js';
+import {
+  approveBooking,
+  listBookingsForOperator,
+  rejectBooking,
+  listCarrierBookingsForOperator,
+  listTerminalsForOperator,
+  getTerminalForOperator,
+  dashboardOverviewForOperator
+} from './operator.service.js';
 
 export async function listBookingsHandler(req: AuthRequest, res: Response) {
   const status = req.query.status as string | undefined;
@@ -35,4 +43,20 @@ export async function rejectBookingHandler(req: AuthRequest, res: Response) {
 export async function listCarrierBookingsHandler(req: AuthRequest, res: Response) {
   const bookings = await listCarrierBookingsForOperator(req.user!.id, req.params.carrierId);
   return res.json(bookings);
+}
+
+export async function listTerminalsForOperatorHandler(req: AuthRequest, res: Response) {
+  const terminals = await listTerminalsForOperator(req.user!.id);
+  return res.json(terminals);
+}
+
+export async function getTerminalForOperatorHandler(req: AuthRequest, res: Response) {
+  const terminal = await getTerminalForOperator(req.user!.id, req.params.id);
+  if (!terminal) return res.status(404).json({ message: 'Terminal not found' });
+  return res.json(terminal);
+}
+
+export async function dashboardOverviewForOperatorHandler(req: AuthRequest, res: Response) {
+  const data = await dashboardOverviewForOperator(req.user!.id);
+  return res.json(data);
 }

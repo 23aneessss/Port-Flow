@@ -1,5 +1,5 @@
 import { prisma } from '../config/db.js';
-import type { Prisma, PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 
 type AuditDbClient = PrismaClient | Prisma.TransactionClient;
 

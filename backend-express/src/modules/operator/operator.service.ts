@@ -2,9 +2,13 @@ import { prisma } from '../../config/db.js';
 import { auditLog } from '../../utils/audit.js';
 import { NotificationType } from '@prisma/client';
 
-export async function listBookingsForOperator(userId: string, status?: string) {
+async function hasOperatorProfile(userId: string) {
   const profile = await prisma.operatorProfile.findUnique({ where: { userId } });
-  if (!profile) return [];
+  return !!profile;
+}
+
+export async function listBookingsForOperator(userId: string, status?: string) {
+  if (!(await hasOperatorProfile(userId))) return [];
   return prisma.booking.findMany({
     where: {
       status: status as any
@@ -83,11 +87,58 @@ export async function rejectBooking(operatorUserId: string, bookingId: string) {
 }
 
 export async function listCarrierBookingsForOperator(operatorUserId: string, carrierId: string) {
-  const profile = await prisma.operatorProfile.findUnique({ where: { userId: operatorUserId } });
-  if (!profile) return [];
+  if (!(await hasOperatorProfile(operatorUserId))) return [];
   return prisma.booking.findMany({
     where: {
       carrierUserId: carrierId
     }
   });
+}
+
+export async function listTerminalsForOperator(operatorUserId: string) {
+  if (!(await hasOperatorProfile(operatorUserId))) return [];
+  return prisma.terminal.findMany();
+}
+
+export async function getTerminalForOperator(operatorUserId: string, terminalId: string) {
+  if (!(await hasOperatorProfile(operatorUserId))) return null;
+  return prisma.terminal.findUnique({ where: { id: terminalId } });
+}
+
+export async function dashboardOverviewForOperator(operatorUserId: string) {
+  if (!(await hasOperatorProfile(operatorUserId))) {
+    return {
+      totalBookings: 0,
+      pendingBookings: 0,
+      carriersPending: 0,
+      totalTerminals: 0,
+      totalCarriers: 0,
+      totalDrivers: 0
+    };
+  }
+
+  const [
+    totalBookings,
+    pendingBookings,
+    carriersPending,
+    totalTerminals,
+    totalCarriers,
+    totalDrivers
+  ] = await Promise.all([
+    prisma.booking.count(),
+    prisma.booking.count({ where: { status: 'PENDING' } }),
+    prisma.carrierProfile.count({ where: { status: 'PENDING' } }),
+    prisma.terminal.count(),
+    prisma.carrierProfile.count(),
+    prisma.driverProfile.count()
+  ]);
+
+  return {
+    totalBookings,
+    pendingBookings,
+    carriersPending,
+    totalTerminals,
+    totalCarriers,
+    totalDrivers
+  };
 }

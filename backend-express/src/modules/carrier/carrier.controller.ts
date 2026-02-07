@@ -9,6 +9,7 @@ import {
   listDriverTrips,
   createBooking,
   listBookings,
+  listTerminalsForCarrier,
   updateBooking,
   deleteBooking
 } from './carrier.service.js';
@@ -104,6 +105,11 @@ export async function createBookingHandler(req: AuthRequest, res: Response) {
 export async function listBookingsHandler(req: AuthRequest, res: Response) {
   const bookings = await listBookings(req.user!.id);
   return res.json(bookings);
+}
+
+export async function listTerminalsForCarrierHandler(_req: AuthRequest, res: Response) {
+  const terminals = await listTerminalsForCarrier();
+  return res.json(terminals);
 }
 
 export async function updateBookingHandler(req: AuthRequest, res: Response) {

@@ -147,6 +147,12 @@ export async function listBookings(carrierUserId: string) {
   return prisma.booking.findMany({ where: { carrierUserId } });
 }
 
+export async function listTerminalsForCarrier() {
+  return prisma.terminal.findMany({
+    select: { id: true, name: true }
+  });
+}
+
 export async function updateBooking(carrierUserId: string, bookingId: string, data: any) {
   await ensureCarrierApproved(carrierUserId);
   const booking = await prisma.booking.findUnique({ where: { id: bookingId } });

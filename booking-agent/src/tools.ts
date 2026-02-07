@@ -256,7 +256,7 @@ export function createBookingTools(apiClient: ApiClient) {
     parameters: GetBookingStatusInputSchema,
     execute: async ({ bookingId }) => {
       // Try carrier endpoint first, fall back to operator endpoint
-      let response = await apiClient.get<Booking>(
+      let response = await apiClient.get<Booking[]>(
         `/carrier/bookings`
       );
       
@@ -273,9 +273,9 @@ export function createBookingTools(apiClient: ApiClient) {
       }
 
       // Try operator endpoint
-      response = await apiClient.get<Booking[]>('/operator/bookings');
-      if (response.success && Array.isArray(response.data)) {
-        const booking = response.data.find((b: Booking) => b.id === bookingId);
+      const operatorResponse = await apiClient.get<Booking[]>('/operator/bookings');
+      if (operatorResponse.success && Array.isArray(operatorResponse.data)) {
+        const booking = operatorResponse.data.find((b: Booking) => b.id === bookingId);
         if (booking) {
           return {
             found: true,

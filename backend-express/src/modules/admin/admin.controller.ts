@@ -1,12 +1,16 @@
 import { Request, Response } from 'express';
 import {
   createOperator,
+  getOperator,
+  updateOperator,
+  deleteOperator,
   createTerminal,
   listTerminals,
   getTerminal,
   updateTerminal,
   deleteTerminal,
   listCarriers,
+  updateCarrier,
   approveCarrier,
   rejectCarrier,
   listCarrierDrivers,
@@ -26,6 +30,31 @@ export async function createOperatorHandler(req: AuthRequest, res: Response) {
     birthDate: new Date(req.body.birthDate)
   }, req.user!.id);
   return res.status(201).json(result);
+}
+
+export async function getOperatorHandler(req: Request, res: Response) {
+  const operator = await getOperator(req.params.id);
+  if (!operator) return res.status(404).json({ message: 'Operator not found' });
+  return res.json(operator);
+}
+
+export async function updateOperatorHandler(req: AuthRequest, res: Response) {
+  const operator = await updateOperator(req.params.id, {
+    email: req.body.email,
+    password: req.body.password,
+    isActive: req.body.isActive,
+    firstName: req.body.firstName,
+    lastName: req.body.lastName,
+    phone: req.body.phone,
+    gender: req.body.gender,
+    birthDate: req.body.birthDate ? new Date(req.body.birthDate) : undefined
+  }, req.user!.id);
+  return res.json(operator);
+}
+
+export async function deleteOperatorHandler(req: AuthRequest, res: Response) {
+  const user = await deleteOperator(req.params.id, req.user!.id);
+  return res.json(user);
 }
 
 export async function createTerminalHandler(req: AuthRequest, res: Response) {
@@ -65,6 +94,23 @@ export async function listCarriersHandler(req: Request, res: Response) {
   const status = req.query.status as CarrierStatus | undefined;
   const carriers = await listCarriers(status);
   return res.json(carriers);
+}
+
+export async function updateCarrierHandler(req: AuthRequest, res: Response) {
+  const carrier = await updateCarrier(req.params.id, {
+    email: req.body.email,
+    password: req.body.password,
+    isActive: req.body.isActive,
+    firstName: req.body.firstName,
+    lastName: req.body.lastName,
+    phone: req.body.phone,
+    gender: req.body.gender,
+    birthDate: req.body.birthDate ? new Date(req.body.birthDate) : undefined,
+    companyName: req.body.companyName,
+    status: req.body.status,
+    proofDocumentUrl: req.body.proofDocumentUrl
+  }, req.user!.id);
+  return res.json(carrier);
 }
 
 export async function approveCarrierHandler(req: AuthRequest, res: Response) {

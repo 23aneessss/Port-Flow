@@ -30,6 +30,13 @@ Base URL: `http://localhost:4000`
 }
 ```
 
+`GET /admin/operator/:id`
+
+`PUT /admin/operator/:id`
+- Body (JSON): any updatable operator fields
+
+`DELETE /admin/operator/:id`
+
 `POST /admin/terminals`
 - Body (JSON):
 ```json
@@ -54,6 +61,9 @@ Base URL: `http://localhost:4000`
 
 `GET /admin/carriers?status=PENDING|APPROVED|REJECTED|SUSPENDED`
 
+`PUT /admin/carriers/:id`
+- Body (JSON): any updatable carrier fields
+
 `POST /admin/carriers/:id/approve`
 
 `POST /admin/carriers/:id/reject`
@@ -71,6 +81,12 @@ Base URL: `http://localhost:4000`
 `POST /operator/bookings/:id/reject`
 
 `GET /operator/carriers/:carrierId/bookings`
+
+`GET /operator/terminals`
+
+`GET /operator/terminals/:id`
+
+`GET /operator/dashboard/overview`
 
 ## Carrier (CARRIER)
 
@@ -116,6 +132,8 @@ Base URL: `http://localhost:4000`
 `DELETE /carrier/drivers/:id`
 
 `GET /carrier/drivers/:id/trips`
+
+`GET /carrier/terminals`
 
 `POST /carrier/bookings`
 - Body (JSON):

@@ -13,11 +13,9 @@
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",
-    "@trpc/server": "^11.0.0-rc.532",
-    "ai": "^4.1.0",
-    "@ai-sdk/mistral": "^1.1.0",
+    "@types/cors": "^2.8.19",
     "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
+    "cors": "^2.8.6",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",

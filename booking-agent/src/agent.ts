@@ -141,6 +141,8 @@ export class BookingAgent {
 
     // Wait for completion to get tool calls
     const finalResult = await result;
+    const toolCalls = await finalResult.toolCalls;
+    const toolResults = await finalResult.toolResults;
 
     // Add assistant response to history
     this.conversationHistory.push({
@@ -150,10 +152,10 @@ export class BookingAgent {
 
     return {
       text: fullText,
-      toolCalls: finalResult.toolCalls?.map((call, index) => ({
+      toolCalls: toolCalls?.map((call: { toolName: string; args: unknown }, index: number) => ({
         toolName: call.toolName,
         args: call.args,
-        result: finalResult.toolResults?.[index]?.result,
+        result: toolResults?.[index]?.result,
       })),
     };
   }

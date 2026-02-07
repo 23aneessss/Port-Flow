@@ -11,6 +11,7 @@ import {
   listDriverTripsHandler,
   createBookingHandler,
   listBookingsHandler,
+  listTerminalsForCarrierHandler,
   updateBookingHandler,
   deleteBookingHandler
 } from './carrier.controller.js';
@@ -74,6 +75,8 @@ router.get('/drivers', listDriversHandler);
 router.put('/drivers/:id', updateDriverHandler);
 router.delete('/drivers/:id', deleteDriverHandler);
 router.get('/drivers/:id/trips', listDriverTripsHandler);
+
+router.get('/terminals', listTerminalsForCarrierHandler);
 
 router.post('/bookings', (req, res, next) => {
   try {
