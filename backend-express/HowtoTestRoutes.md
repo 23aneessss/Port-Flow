@@ -257,8 +257,14 @@ Delete booking (only if status is `PENDING`).
 ### GET /driver/bookings/mine
 List bookings assigned to the driver.
 
+### GET /driver/history
+List consumed bookings for the driver.
+
 ### GET /driver/bookings/:id/qr
 Get QR payload for booking.
+
+### GET /driver/profile
+Get driver profile.
 
 ### GET /driver/notifications
 List notifications.
