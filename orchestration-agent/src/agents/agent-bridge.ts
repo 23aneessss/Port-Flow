@@ -194,7 +194,7 @@ export class AgentBridge {
     const args = task.toolArgs;
     let message = task.description;
 
-    // Add specific parameters to the message
+    // Add all available parameters to the message
     if (args.terminalId) {
       message += `. Terminal ID: ${args.terminalId}`;
     }
@@ -207,8 +207,28 @@ export class AgentBridge {
     if (args.date) {
       message += `. Date: ${args.date}`;
     }
+    if (args.timeSlot) {
+      message += `. Time slot: ${args.timeSlot}`;
+    }
+    if (args.startTime) {
+      message += `. Start time: ${args.startTime}`;
+    }
+    if (args.endTime) {
+      message += `. End time: ${args.endTime}`;
+    }
+    if (args.driverUserId) {
+      message += `. Driver ID: ${args.driverUserId}`;
+    }
     if (args.status) {
       message += `. Filter by status: ${args.status}`;
+    }
+    
+    // Add any other args that haven't been handled explicitly
+    const handledKeys = ['terminalId', 'terminalName', 'bookingId', 'date', 'timeSlot', 'startTime', 'endTime', 'driverUserId', 'status'];
+    for (const [key, value] of Object.entries(args)) {
+      if (!handledKeys.includes(key) && value !== undefined && value !== null) {
+        message += `. ${key}: ${value}`;
+      }
     }
 
     return message;

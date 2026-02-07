@@ -250,8 +250,10 @@ function buildToolArgs(
 ): Record<string, unknown> {
   const args: Record<string, unknown> = {};
   
-  // Map entities to tool args
-  const entityMapping: Record<string, string> = {
+  // Map from entity keys (step 2) to tool arg names
+  // Key: entity key from IntentClassification.extractedEntities
+  // Value: corresponding tool argument name
+  const entityToToolArg: Record<string, string> = {
     terminalId: 'terminalId',
     terminalName: 'terminalName',
     bookingId: 'bookingId',
@@ -261,10 +263,24 @@ function buildToolArgs(
     status: 'status',
   };
   
-  for (const entity of [...template.requiredEntities, ...template.optionalEntities]) {
-    const entityKey = Object.keys(entityMapping).find(k => entityMapping[k] === entity);
-    if (entityKey && entities[entityKey as keyof typeof entities]) {
-      args[entity] = entities[entityKey as keyof typeof entities];
+  // Reverse mapping for required/optional entity lookup
+  const toolArgToEntity: Record<string, string> = {
+    terminalId: 'terminalId',
+    terminalName: 'terminalName',
+    bookingId: 'bookingId',
+    date: 'date',
+    timeSlot: 'timeSlot',
+    driverUserId: 'driverId',
+    status: 'status',
+    startTime: 'timeSlot', // timeSlot may contain start time
+    endTime: 'timeSlot',   // timeSlot may contain end time
+  };
+  
+  // Copy all extracted entities to args with proper mapping
+  for (const [entityKey, value] of Object.entries(entities)) {
+    if (value !== undefined && value !== null && value !== '') {
+      const toolArgName = entityToToolArg[entityKey] || entityKey;
+      args[toolArgName] = value;
     }
   }
   
