@@ -2,19 +2,19 @@
 
 import React from "react"
 
-import { useState } from 'react'
-import { bookings, terminals, carrierNames, driverNames } from '@/lib/mock-data'
-import { Search, Send } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { listBookings, listTerminals, type Booking, type Terminal } from '@/lib/api'
+import { Search, Send, Loader2 } from 'lucide-react'
 
 type QueryResult =
   | {
       type: 'bookings'
-      data: typeof bookings
+      data: Booking[]
       query: string
     }
   | {
       type: 'terminals'
-      data: typeof terminals
+      data: Terminal[]
       query: string
     }
   | {
@@ -35,6 +35,25 @@ export function QueryInterface() {
   const [query, setQuery] = useState('')
   const [result, setResult] = useState<QueryResult>(null)
   const [loading, setLoading] = useState(false)
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [terminals, setTerminals] = useState<Terminal[]>([])
+  const [dataLoading, setDataLoading] = useState(true)
+
+  useEffect(() => {
+    Promise.all([
+      listBookings().catch(() => []),
+      listTerminals().catch(() => []),
+    ]).then(([bk, tm]) => {
+      setBookings(bk as Booking[])
+      setTerminals(tm as Terminal[])
+      setDataLoading(false)
+    })
+  }, [])
+
+  const getTerminalName = (terminalId: string) => {
+    const t = terminals.find(t => t.id === terminalId)
+    return t ? t.name : terminalId
+  }
 
   const parseQuery = (input: string): QueryResult => {
     const lowerInput = input.toLowerCase()
@@ -46,41 +65,20 @@ export function QueryInterface() {
       lowerInput.includes('transport') ||
       lowerInput.includes('truck')
     ) {
-      // Filter by status if specified
       if (lowerInput.includes('pending')) {
-        return {
-          type: 'bookings',
-          data: bookings.filter((b) => b.status === 'PENDING'),
-          query: input,
-        }
+        return { type: 'bookings', data: bookings.filter((b) => b.status === 'PENDING'), query: input }
       }
       if (lowerInput.includes('confirmed') || lowerInput.includes('accepted')) {
-        return {
-          type: 'bookings',
-          data: bookings.filter((b) => b.status === 'CONFIRMED'),
-          query: input,
-        }
+        return { type: 'bookings', data: bookings.filter((b) => b.status === 'CONFIRMED'), query: input }
       }
       if (lowerInput.includes('rejected')) {
-        return {
-          type: 'bookings',
-          data: bookings.filter((b) => b.status === 'REJECTED'),
-          query: input,
-        }
+        return { type: 'bookings', data: bookings.filter((b) => b.status === 'REJECTED'), query: input }
       }
       if (lowerInput.includes('consumed')) {
-        return {
-          type: 'bookings',
-          data: bookings.filter((b) => b.status === 'CONSUMED'),
-          query: input,
-        }
+        return { type: 'bookings', data: bookings.filter((b) => b.status === 'CONSUMED'), query: input }
       }
       if (lowerInput.includes('cancelled')) {
-        return {
-          type: 'bookings',
-          data: bookings.filter((b) => b.status === 'CANCELLED'),
-          query: input,
-        }
+        return { type: 'bookings', data: bookings.filter((b) => b.status === 'CANCELLED'), query: input }
       }
       return { type: 'bookings', data: bookings, query: input }
     }
@@ -104,20 +102,13 @@ export function QueryInterface() {
       const totalBookings = bookings.length
       const pendingBookings = bookings.filter((b) => b.status === 'PENDING').length
       const confirmedBookings = bookings.filter((b) => b.status === 'CONFIRMED').length
-      const totalCapacity = terminals.reduce((acc, t) => acc + t.capacity, 0)
-      const totalLoad = terminals.reduce((acc, t) => acc + t.currentLoad, 0)
-      const saturation = Math.round((totalLoad / totalCapacity) * 100)
+      const totalCapacity = terminals.reduce((acc, t) => acc + t.maxSlots, 0)
+      const totalLoad = terminals.reduce((acc, t) => acc + (t.maxSlots - t.availableSlots), 0)
+      const saturation = totalCapacity > 0 ? Math.round((totalLoad / totalCapacity) * 100) : 0
 
       return {
         type: 'stats',
-        data: {
-          totalBookings,
-          pendingBookings,
-          acceptedBookings: confirmedBookings,
-          totalCapacity,
-          totalLoad,
-          saturation,
-        },
+        data: { totalBookings, pendingBookings, acceptedBookings: confirmedBookings, totalCapacity, totalLoad, saturation },
         query: input,
       }
     }
@@ -130,12 +121,19 @@ export function QueryInterface() {
     if (!query.trim()) return
 
     setLoading(true)
-    // Simulate processing delay
     setTimeout(() => {
       const parsedResult = parseQuery(query)
       setResult(parsedResult)
       setLoading(false)
     }, 300)
+  }
+
+  if (dataLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
@@ -190,9 +188,6 @@ export function QueryInterface() {
                         Driver
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Operation
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         Status
                       </th>
                     </tr>
@@ -207,22 +202,13 @@ export function QueryInterface() {
                           {booking.id.slice(0, 8)}...
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">
-                          {carrierNames[booking.carrier_id] || booking.carrier_id}
+                          {booking.carrier?.email || booking.carrierUserId}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">
-                          {terminals.find(t => t.id === booking.terminal_id)?.name || booking.terminal_id}
+                          {getTerminalName(booking.terminalId)}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">
-                          {driverNames[booking.driver_id] || booking.driver_id}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                            booking.operation_type === 'DROP_OFF'
-                              ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200'
-                              : 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200'
-                          }`}>
-                            {booking.operation_type === 'DROP_OFF' ? 'Drop Off' : 'Pick Up'}
-                          </span>
+                          {booking.driver?.email || '—'}
                         </td>
                         <td className="px-4 py-3">
                           <span
@@ -257,46 +243,45 @@ export function QueryInterface() {
 
             {result.type === 'terminals' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {result.data.map((terminal) => (
-                  <div
-                    key={terminal.id}
-                    className="rounded-xl ring-1 ring-slate-200 p-4 bg-slate-50 transition-shadow hover:shadow-sm"
-                  >
-                    <h4 className="font-semibold text-foreground">
-                      {terminal.name}
-                    </h4>
-                    <div className="mt-3 space-y-2 text-sm">
-                      <p className="text-muted-foreground">
-                        Location: {terminal.location}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-border rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full ${
-                              terminal.currentLoad / terminal.capacity > 0.9
-                                ? 'bg-red-500'
-                                : terminal.currentLoad / terminal.capacity > 0.7
-                                  ? 'bg-amber-500'
-                                  : 'bg-green-500'
-                            }`}
-                            style={{
-                              width: `${(terminal.currentLoad / terminal.capacity) * 100}%`,
-                            }}
-                          />
+                {result.data.map((terminal) => {
+                  const currentLoad = terminal.maxSlots - terminal.availableSlots
+                  const saturation = terminal.maxSlots > 0 ? Math.round((currentLoad / terminal.maxSlots) * 100) : 0
+                  return (
+                    <div
+                      key={terminal.id}
+                      className="rounded-xl ring-1 ring-slate-200 p-4 bg-slate-50 transition-shadow hover:shadow-sm"
+                    >
+                      <h4 className="font-semibold text-foreground">
+                        {terminal.name}
+                      </h4>
+                      <div className="mt-3 space-y-2 text-sm">
+                        <p className="text-muted-foreground">
+                          Status: {terminal.status}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 bg-border rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full ${
+                                saturation > 90
+                                  ? 'bg-red-500'
+                                  : saturation > 70
+                                    ? 'bg-amber-500'
+                                    : 'bg-green-500'
+                              }`}
+                              style={{ width: `${saturation}%` }}
+                            />
+                          </div>
+                          <span className="font-medium text-foreground">
+                            {saturation}%
+                          </span>
                         </div>
-                        <span className="font-medium text-foreground">
-                          {Math.round(
-                            (terminal.currentLoad / terminal.capacity) * 100
-                          )}
-                          %
-                        </span>
+                        <p className="text-muted-foreground">
+                          Slots: {currentLoad}/{terminal.maxSlots} used
+                        </p>
                       </div>
-                      <p className="text-muted-foreground">
-                        Capacity: {terminal.currentLoad}/{terminal.capacity} trucks
-                      </p>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
 

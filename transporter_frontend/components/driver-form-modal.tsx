@@ -21,13 +21,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
 import type { Driver, DriverStatus } from "@/lib/data"
 
 interface DriverFormModalProps {
   open: boolean
   onClose: () => void
-  onSubmit: (data: Omit<Driver, "id">) => void
+  onSubmit: (data: any) => void
   initialData?: Driver | null
 }
 
@@ -37,37 +36,76 @@ export function DriverFormModal({
   onSubmit,
   initialData,
 }: DriverFormModalProps) {
-  const [fullName, setFullName] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
   const [phone, setPhone] = useState("")
-  const [status, setStatus] = useState<DriverStatus>("Active")
+  const [gender, setGender] = useState("")
+  const [birthDate, setBirthDate] = useState("")
+  const [status, setStatus] = useState<DriverStatus>("ACTIVE")
   const [truckNumber, setTruckNumber] = useState("")
-  const [plateNumber, setPlateNumber] = useState("")
-  const [licenseNumber, setLicenseNumber] = useState("")
-  const [licenseVerified, setLicenseVerified] = useState(false)
+  const [truckPlate, setTruckPlate] = useState("")
+  const [drivingLicenseUrl, setDrivingLicenseUrl] = useState("")
 
   useEffect(() => {
     if (initialData) {
-      setFullName(initialData.fullName)
+      setEmail(initialData.user?.email || "")
+      setPassword("")
+      setFirstName(initialData.firstName)
+      setLastName(initialData.lastName)
       setPhone(initialData.phone)
+      setGender(initialData.gender)
+      setBirthDate(initialData.birthDate ? initialData.birthDate.split("T")[0] : "")
       setStatus(initialData.status)
       setTruckNumber(initialData.truckNumber)
-      setPlateNumber(initialData.plateNumber)
-      setLicenseNumber(initialData.licenseNumber)
-      setLicenseVerified(initialData.licenseVerified)
+      setTruckPlate(initialData.truckPlate)
+      setDrivingLicenseUrl(initialData.drivingLicenseUrl)
     } else {
-      setFullName("")
+      setEmail("")
+      setPassword("")
+      setFirstName("")
+      setLastName("")
       setPhone("")
-      setStatus("Active")
+      setGender("")
+      setBirthDate("")
+      setStatus("ACTIVE")
       setTruckNumber("")
-      setPlateNumber("")
-      setLicenseNumber("")
-      setLicenseVerified(false)
+      setTruckPlate("")
+      setDrivingLicenseUrl("")
     }
   }, [initialData, open])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit({ fullName, phone, status, truckNumber, plateNumber, licenseNumber, licenseVerified })
+    if (initialData) {
+      // Update — only send profile fields
+      onSubmit({
+        firstName,
+        lastName,
+        phone,
+        gender,
+        birthDate,
+        status,
+        truckNumber,
+        truckPlate,
+        drivingLicenseUrl,
+      })
+    } else {
+      // Create — send all required fields
+      onSubmit({
+        email,
+        password,
+        firstName,
+        lastName,
+        phone,
+        gender,
+        birthDate,
+        truckNumber,
+        truckPlate,
+        drivingLicenseUrl,
+      })
+    }
     onClose()
   }
 
@@ -85,41 +123,107 @@ export function DriverFormModal({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          {!initialData && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="email" className="text-xs">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="driver@email.com"
+                  className="h-8 text-sm"
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="password" className="text-xs">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Min. 6 characters"
+                  className="h-8 text-sm"
+                  required
+                />
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <Label htmlFor="fullName" className="text-xs">Full Name</Label>
+              <Label htmlFor="firstName" className="text-xs">First Name</Label>
               <Input
-                id="fullName"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Enter full name"
+                id="firstName"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="First name"
                 className="h-8 text-sm"
                 required
               />
             </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="lastName" className="text-xs">Last Name</Label>
+              <Input
+                id="lastName"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Last name"
+                className="h-8 text-sm"
+                required
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
               <Label htmlFor="phone" className="text-xs">Phone</Label>
               <Input
                 id="phone"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="+212 6XX XXX XXX"
+                placeholder="+213 6XX XXX XXX"
                 className="h-8 text-sm"
                 required
               />
             </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="gender" className="text-xs">Gender</Label>
+              <Select value={gender} onValueChange={setGender}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Male">Male</SelectItem>
+                  <SelectItem value="Female">Female</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="status" className="text-xs">Status</Label>
-            <Select value={status} onValueChange={(v) => setStatus(v as DriverStatus)}>
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Active">Active</SelectItem>
-                <SelectItem value="Suspended">Suspended</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="birthDate" className="text-xs">Date of Birth</Label>
+              <Input
+                id="birthDate"
+                type="date"
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                className="h-8 text-sm"
+                required
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="status" className="text-xs">Status</Label>
+              <Select value={status} onValueChange={(v) => setStatus(v as DriverStatus)}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="SUSPENDED">Suspended</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
@@ -134,11 +238,11 @@ export function DriverFormModal({
               />
             </div>
             <div className="flex flex-col gap-1">
-              <Label htmlFor="plateNumber" className="text-xs">Plate Number</Label>
+              <Label htmlFor="truckPlate" className="text-xs">Truck Plate</Label>
               <Input
-                id="plateNumber"
-                value={plateNumber}
-                onChange={(e) => setPlateNumber(e.target.value)}
+                id="truckPlate"
+                value={truckPlate}
+                onChange={(e) => setTruckPlate(e.target.value)}
                 placeholder="12345-A-1"
                 className="h-8 text-sm"
                 required
@@ -146,23 +250,15 @@ export function DriverFormModal({
             </div>
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="licenseNumber" className="text-xs">License Number</Label>
+            <Label htmlFor="drivingLicenseUrl" className="text-xs">Driving License URL</Label>
             <Input
-              id="licenseNumber"
-              value={licenseNumber}
-              onChange={(e) => setLicenseNumber(e.target.value)}
-              placeholder="LIC-2024-001"
+              id="drivingLicenseUrl"
+              value={drivingLicenseUrl}
+              onChange={(e) => setDrivingLicenseUrl(e.target.value)}
+              placeholder="https://example.com/license.pdf"
               className="h-8 text-sm"
               required
             />
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="licenseVerified"
-              checked={licenseVerified}
-              onCheckedChange={(checked) => setLicenseVerified(checked === true)}
-            />
-            <Label htmlFor="licenseVerified" className="cursor-pointer text-xs">License Verified</Label>
           </div>
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" onClick={onClose}>

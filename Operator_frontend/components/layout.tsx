@@ -11,19 +11,30 @@ import {
   AlertCircle,
   ChevronRight,
   User,
+  LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { AuthGuard, useAuth } from '@/lib/auth'
 import operatorLogo from '@/assets/operator.webp'
 
 const navItems = [
-  { href: '/', label: 'Dashboard', icon: BarChart3 },
+  { href: '/dashboard', label: 'Dashboard', icon: BarChart3 },
   { href: '/query', label: 'Query', icon: Search },
   { href: '/bookings', label: 'Bookings', icon: CalendarCheck },
   { href: '/alerts', label: 'Alerts', icon: AlertCircle },
 ]
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthGuard requiredRole="OPERATOR">
+      <LayoutInner>{children}</LayoutInner>
+    </AuthGuard>
+  )
+}
+
+function LayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const { logout } = useAuth()
 
   return (
     <div className="flex h-screen bg-background">
@@ -89,10 +100,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <p className="truncate text-sm font-medium text-[hsl(var(--sidebar-foreground))]">
                 Operator
               </p>
-              <p className="truncate text-[11px] text-[hsl(var(--sidebar-foreground))]/40">
-                admin@portops.com
-              </p>
             </div>
+            <button
+              onClick={logout}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-[hsl(var(--sidebar-foreground))]/50 hover:text-[hsl(var(--sidebar-foreground))] hover:bg-[hsl(var(--sidebar-accent))] transition-colors"
+              title="Logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </aside>

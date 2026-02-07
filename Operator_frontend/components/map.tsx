@@ -1,11 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { terminals } from '@/lib/mock-data'
-import {
-  getSaturationLevel,
-  getSaturationColor,
-} from '@/lib/mock-data'
+import { listTerminals, type Terminal } from '@/lib/api'
+import { Loader2 } from 'lucide-react'
 
 interface MapProps {
   onTerminalSelect?: (terminalId: string) => void
@@ -14,9 +11,18 @@ interface MapProps {
 export function Map({ onTerminalSelect }: MapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstance = useRef<any>(null)
+  const [terminalsData, setTerminalsData] = useState<Terminal[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    if (!mapRef.current || mapInstance.current) return
+    listTerminals()
+      .then(setTerminalsData)
+      .catch(() => {})
+      .finally(() => setIsLoading(false))
+  }, [])
+
+  useEffect(() => {
+    if (isLoading || !mapRef.current || mapInstance.current) return
 
     const initializeMap = async () => {
       if (mapInstance.current) return
@@ -51,8 +57,9 @@ export function Map({ onTerminalSelect }: MapProps) {
       }).addTo(map)
 
       // Add location pin markers
-      terminals.forEach((terminal) => {
-        const saturation = getSaturationLevel(terminal)
+      terminalsData.forEach((terminal) => {
+        const currentLoad = terminal.maxSlots - terminal.availableSlots
+        const saturation = terminal.maxSlots > 0 ? Math.round((currentLoad / terminal.maxSlots) * 100) : 0
 
         let pinColor = '#10b981'
         let pulseColor = 'rgba(16, 185, 129, 0.3)'
@@ -63,6 +70,10 @@ export function Map({ onTerminalSelect }: MapProps) {
           pinColor = '#f59e0b'
           pulseColor = 'rgba(245, 158, 11, 0.3)'
         }
+
+        // Use coordX as latitude, coordY as longitude
+        const lat = terminal.coordX
+        const lng = terminal.coordY
 
         // Location pin icon SVG
         const customIcon = L.divIcon({
@@ -93,14 +104,9 @@ export function Map({ onTerminalSelect }: MapProps) {
           className: '',
         })
 
-        const marker = L.marker([terminal.latitude, terminal.longitude], {
+        const marker = L.marker([lat, lng], {
           icon: customIcon,
         }).addTo(map)
-
-        const pendingHtml =
-          terminal.pendingBookings > 0
-            ? `<div style="margin-top:8px;padding:4px 8px;background:#EFF6FF;border-radius:6px;font-size:11px;color:#1D4ED8;font-weight:500;">${terminal.pendingBookings} pending booking${terminal.pendingBookings > 1 ? 's' : ''}</div>`
-            : ''
 
         marker.bindPopup(`
           <div style="font-family:'Roboto Condensed',sans-serif;min-width:180px;padding:4px;">
@@ -113,9 +119,8 @@ export function Map({ onTerminalSelect }: MapProps) {
               <div style="height:100%;width:${saturation}%;background:${pinColor};border-radius:99px;transition:width 0.3s;"></div>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:11px;color:#64748B;">
-              <span>${terminal.currentLoad} / ${terminal.capacity} trucks</span>
+              <span>${currentLoad} / ${terminal.maxSlots} slots used</span>
             </div>
-            ${pendingHtml}
           </div>
         `, { className: 'custom-popup' })
 
@@ -135,7 +140,15 @@ export function Map({ onTerminalSelect }: MapProps) {
         mapInstance.current = null
       }
     }
-  }, [onTerminalSelect])
+  }, [isLoading, terminalsData, onTerminalSelect])
+
+  if (isLoading) {
+    return (
+      <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm flex items-center justify-center h-[420px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">

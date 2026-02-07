@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { CheckCircle, XCircle, Eye, Search, Power } from "lucide-react"
+import { useState, useEffect } from "react"
+import { CheckCircle, XCircle, Eye, Search, Power, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -27,50 +27,101 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { type Transporter, transporters as initialTransporters } from "@/lib/mock-data"
+import {
+  type CarrierProfile,
+  listCarriers,
+  approveCarrier,
+  rejectCarrier,
+  listCarrierDrivers,
+} from "@/lib/api"
 
 function getStatusConfig(status: string) {
   switch (status) {
-    case "ACTIVE":
+    case "APPROVED":
       return { classes: "border-success/30 bg-success/10 text-success", dot: "bg-success animate-pulse" }
     case "SUSPENDED":
       return { classes: "border-destructive/30 bg-destructive/10 text-destructive", dot: "bg-destructive" }
     case "PENDING":
       return { classes: "border-warning/30 bg-warning/10 text-warning", dot: "bg-warning animate-pulse" }
+    case "REJECTED":
+      return { classes: "border-destructive/30 bg-destructive/10 text-destructive", dot: "bg-destructive" }
     default:
       return { classes: "", dot: "" }
   }
 }
 
+interface DriverInfo {
+  userId: string
+  firstName: string
+  lastName: string
+  phone: string
+  truckPlate: string
+}
+
 export function TransporterTable() {
-  const [transporters, setTransporters] = useState<Transporter[]>(initialTransporters)
+  const [carriers, setCarriers] = useState<CarrierProfile[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("ALL")
-  const [selectedTransporter, setSelectedTransporter] = useState<Transporter | null>(null)
+  const [selectedCarrier, setSelectedCarrier] = useState<CarrierProfile | null>(null)
+  const [carrierDrivers, setCarrierDrivers] = useState<DriverInfo[]>([])
   const [showDetail, setShowDetail] = useState(false)
+  const [loadingDrivers, setLoadingDrivers] = useState(false)
 
-  const filtered = transporters.filter((t) => {
-    const matchesSearch = t.name.toLowerCase().includes(search.toLowerCase())
-    const matchesStatus = statusFilter === "ALL" || t.status === statusFilter
+  async function fetchCarriers() {
+    try {
+      const data = await listCarriers()
+      setCarriers(data)
+    } catch (err) {
+      console.error("Failed to fetch carriers:", err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchCarriers()
+  }, [])
+
+  const filtered = carriers.filter((c) => {
+    const name = `${c.firstName} ${c.lastName} ${c.companyName}`.toLowerCase()
+    const matchesSearch = name.includes(search.toLowerCase())
+    const matchesStatus = statusFilter === "ALL" || c.status === statusFilter
     return matchesSearch && matchesStatus
   })
 
-  const pendingCount = transporters.filter((t) => t.status === "PENDING").length
+  const pendingCount = carriers.filter((c) => c.status === "PENDING").length
 
-  function validateTransporter(id: string) {
-    setTransporters((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, status: "ACTIVE" as const } : t))
-    )
+  async function handleApprove(id: string) {
+    try {
+      await approveCarrier(id)
+      await fetchCarriers()
+    } catch (err) {
+      console.error("Failed to approve carrier:", err)
+    }
   }
 
-  function toggleStatus(id: string) {
-    setTransporters((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? { ...t, status: t.status === "ACTIVE" ? ("SUSPENDED" as const) : ("ACTIVE" as const) }
-          : t
-      )
-    )
+  async function handleReject(id: string) {
+    try {
+      await rejectCarrier(id)
+      await fetchCarriers()
+    } catch (err) {
+      console.error("Failed to reject carrier:", err)
+    }
+  }
+
+  async function openDetail(c: CarrierProfile) {
+    setSelectedCarrier(c)
+    setShowDetail(true)
+    setLoadingDrivers(true)
+    try {
+      const drivers = await listCarrierDrivers(c.userId)
+      setCarrierDrivers(drivers)
+    } catch {
+      setCarrierDrivers([])
+    } finally {
+      setLoadingDrivers(false)
+    }
   }
 
   return (
@@ -103,8 +154,9 @@ export function TransporterTable() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">All Status</SelectItem>
-              <SelectItem value="ACTIVE">Active</SelectItem>
+              <SelectItem value="APPROVED">Approved</SelectItem>
               <SelectItem value="PENDING">Pending</SelectItem>
+              <SelectItem value="REJECTED">Rejected</SelectItem>
               <SelectItem value="SUSPENDED">Suspended</SelectItem>
             </SelectContent>
           </Select>
@@ -112,29 +164,34 @@ export function TransporterTable() {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
         <Table>
           <TableHeader>
             <TableRow className="bg-secondary/50 hover:bg-secondary/50">
               <TableHead className="font-heading text-xs font-semibold uppercase tracking-wider text-muted-foreground">Name</TableHead>
+              <TableHead className="font-heading text-xs font-semibold uppercase tracking-wider text-muted-foreground">Company</TableHead>
               <TableHead className="font-heading text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phone</TableHead>
-              <TableHead className="font-heading text-xs font-semibold uppercase tracking-wider text-muted-foreground">Drivers</TableHead>
               <TableHead className="font-heading text-xs font-semibold uppercase tracking-wider text-muted-foreground">Registered</TableHead>
               <TableHead className="font-heading text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</TableHead>
               <TableHead className="font-heading text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((t) => (
-              <TableRow key={t.id} className="hover:bg-secondary/30 transition-colors duration-150 animate-fade-in-up" style={{ animationDelay: `${filtered.indexOf(t) * 40}ms` }}>
-                <TableCell className="font-medium text-foreground">{t.name}</TableCell>
-                <TableCell className="text-muted-foreground">{t.phone}</TableCell>
-                <TableCell className="text-muted-foreground">{t.drivers.length}</TableCell>
-                <TableCell className="text-muted-foreground">{t.registered_at}</TableCell>
+            {filtered.map((c, index) => (
+              <TableRow key={c.userId} className="hover:bg-secondary/30 transition-colors duration-150 animate-fade-in-up" style={{ animationDelay: `${index * 40}ms` }}>
+                <TableCell className="font-medium text-foreground">{c.firstName} {c.lastName}</TableCell>
+                <TableCell className="text-muted-foreground">{c.companyName}</TableCell>
+                <TableCell className="text-muted-foreground">{c.phone}</TableCell>
+                <TableCell className="text-muted-foreground">{new Date(c.createdAt).toLocaleDateString()}</TableCell>
                 <TableCell>
-                  {(() => { const config = getStatusConfig(t.status); return (
+                  {(() => { const config = getStatusConfig(c.status); return (
                     <Badge variant="outline" className={config.classes}>
                       <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${config.dot}`} />
-                      {t.status}
+                      {c.status}
                     </Badge>
                   ) })()}
                 </TableCell>
@@ -144,29 +201,29 @@ export function TransporterTable() {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-muted-foreground hover:text-accent hover:bg-accent/10 transition-all duration-150 rounded-full"
-                      onClick={() => { setSelectedTransporter(t); setShowDetail(true) }}
+                      onClick={() => openDetail(c)}
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
-                    {t.status === "PENDING" && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-success hover:text-success/80 hover:bg-success/10 transition-all duration-150 rounded-full"
-                        onClick={() => validateTransporter(t.id)}
-                      >
-                        <CheckCircle className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {t.status !== "PENDING" && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={`h-8 w-8 transition-all duration-150 rounded-full ${t.status === "ACTIVE" ? "text-muted-foreground hover:text-destructive hover:bg-destructive/10" : "text-muted-foreground hover:text-success hover:bg-success/10"}`}
-                        onClick={() => toggleStatus(t.id)}
-                      >
-                        {t.status === "ACTIVE" ? <XCircle className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-                      </Button>
+                    {c.status === "PENDING" && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-success hover:text-success/80 hover:bg-success/10 transition-all duration-150 rounded-full"
+                          onClick={() => handleApprove(c.userId)}
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive/80 hover:bg-destructive/10 transition-all duration-150 rounded-full"
+                          onClick={() => handleReject(c.userId)}
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      </>
                     )}
                   </div>
                 </TableCell>
@@ -174,6 +231,7 @@ export function TransporterTable() {
             ))}
           </TableBody>
         </Table>
+        )}
       </div>
 
       {/* Detail Modal */}
@@ -185,37 +243,51 @@ export function TransporterTable() {
               Viewing transporter information and associated drivers.
             </DialogDescription>
           </DialogHeader>
-          {selectedTransporter && (
+          {selectedCarrier && (
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
                 {[
-                  ["Name", selectedTransporter.name],
-                  ["Phone", selectedTransporter.phone],
-                  ["Status", selectedTransporter.status],
-                  ["Registered", selectedTransporter.registered_at],
+                  ["Name", `${selectedCarrier.firstName} ${selectedCarrier.lastName}`],
+                  ["Company", selectedCarrier.companyName],
+                  ["Email", selectedCarrier.user.email],
+                  ["Phone", selectedCarrier.phone],
+                  ["Status", selectedCarrier.status],
+                  ["Registered", new Date(selectedCarrier.createdAt).toLocaleDateString()],
                 ].map(([label, value]) => (
                   <div key={label} className="flex justify-between rounded-lg bg-secondary/50 px-4 py-2.5">
                     <span className="text-sm text-muted-foreground">{label}</span>
                     <span className="text-sm font-medium text-foreground">{value}</span>
                   </div>
                 ))}
+                {selectedCarrier.proofDocumentUrl && (
+                  <div className="flex justify-between rounded-lg bg-secondary/50 px-4 py-2.5">
+                    <span className="text-sm text-muted-foreground">Proof Document</span>
+                    <a href={selectedCarrier.proofDocumentUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-accent hover:underline">
+                      View Document
+                    </a>
+                  </div>
+                )}
               </div>
               <div>
                 <h4 className="mb-2 font-heading text-sm font-semibold text-foreground">
-                  Drivers ({selectedTransporter.drivers.length})
+                  Drivers
                 </h4>
-                {selectedTransporter.drivers.length > 0 ? (
+                {loadingDrivers ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : carrierDrivers.length > 0 ? (
                   <div className="flex flex-col gap-2">
-                    {selectedTransporter.drivers.map((d) => (
+                    {carrierDrivers.map((d) => (
                       <div
-                        key={d.id}
+                        key={d.userId}
                         className="flex items-center justify-between rounded-lg border border-border bg-secondary/30 px-4 py-2.5"
                       >
                         <div>
-                          <p className="text-sm font-medium text-foreground">{d.name}</p>
+                          <p className="text-sm font-medium text-foreground">{d.firstName} {d.lastName}</p>
                           <p className="text-xs text-muted-foreground">{d.phone}</p>
                         </div>
-                        <span className="text-xs text-muted-foreground">{d.license_number}</span>
+                        <span className="text-xs text-muted-foreground">{d.truckPlate}</span>
                       </div>
                     ))}
                   </div>

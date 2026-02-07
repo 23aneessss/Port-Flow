@@ -1,9 +1,10 @@
 "use client"
 
-import { AlertCircle, AlertTriangle, Info } from "lucide-react"
+import { useEffect, useState } from "react"
+import { AlertCircle, AlertTriangle, Info, Loader2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { anomalies } from "@/lib/mock-data"
+import { listAnomalies, type Anomaly } from "@/lib/api"
 
 function getSeverityConfig(severity: string) {
   switch (severity) {
@@ -29,6 +30,16 @@ function getSeverityConfig(severity: string) {
 }
 
 export function RecentAnomalies() {
+  const [anomalies, setAnomalies] = useState<Anomaly[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    listAnomalies()
+      .then(setAnomalies)
+      .catch((err) => console.error("Failed to load anomalies:", err))
+      .finally(() => setIsLoading(false))
+  }, [])
+
   const recent = anomalies.slice(0, 4)
 
   return (
@@ -37,11 +48,16 @@ export function RecentAnomalies() {
         <CardTitle className="font-heading text-base font-semibold text-foreground flex items-center gap-2">
           Recent Anomalies
           <Badge className="bg-destructive/10 text-destructive border-destructive/20 text-[10px]" variant="outline">
-            {anomalies.filter(a => a.status === "OPEN").length} open
+            {anomalies.length} total
           </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
         <div className="flex flex-col gap-3">
           {recent.map((a, index) => {
             const config = getSeverityConfig(a.severity)
@@ -57,10 +73,10 @@ export function RecentAnomalies() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground group-hover:text-accent transition-colors truncate">
-                    {a.title}
+                    {a.message}
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {a.terminal_name}
+                    {a.terminal?.name || "Unknown Terminal"}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
@@ -76,6 +92,7 @@ export function RecentAnomalies() {
             )
           })}
         </div>
+        )}
       </CardContent>
     </Card>
   )

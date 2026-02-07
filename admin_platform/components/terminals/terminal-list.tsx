@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Pencil, Trash2, Power, Plus, Search } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Pencil, Trash2, Power, Plus, Search, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -30,20 +30,44 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { type Terminal, terminals as initialTerminals, operators } from "@/lib/mock-data"
+import {
+  type Terminal,
+  listTerminals,
+  createTerminal,
+  updateTerminal as apiUpdateTerminal,
+  deleteTerminal as apiDeleteTerminal,
+} from "@/lib/api"
 
 export function TerminalList() {
-  const [terminalsList, setTerminalsList] = useState<Terminal[]>(initialTerminals)
+  const [terminalsList, setTerminalsList] = useState<Terminal[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("ALL")
   const [showForm, setShowForm] = useState(false)
   const [editingTerminal, setEditingTerminal] = useState<Terminal | null>(null)
+  const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
-    max_slots: 100,
-    x: 0,
-    y: 0,
+    maxSlots: 100,
+    availableSlots: 100,
+    coordX: 0,
+    coordY: 0,
   })
+
+  async function fetchTerminals() {
+    try {
+      const data = await listTerminals()
+      setTerminalsList(data)
+    } catch (err) {
+      console.error("Failed to fetch terminals:", err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchTerminals()
+  }, [])
 
   const filtered = terminalsList.filter((t) => {
     const matchesSearch = t.name.toLowerCase().includes(search.toLowerCase())
@@ -53,7 +77,7 @@ export function TerminalList() {
 
   function openCreate() {
     setEditingTerminal(null)
-    setFormData({ name: "", max_slots: 100, x: 0, y: 0 })
+    setFormData({ name: "", maxSlots: 100, availableSlots: 100, coordX: 0, coordY: 0 })
     setShowForm(true)
   }
 
@@ -61,65 +85,63 @@ export function TerminalList() {
     setEditingTerminal(t)
     setFormData({
       name: t.name,
-      max_slots: t.max_slots,
-      x: t.coordinates.x,
-      y: t.coordinates.y,
+      maxSlots: t.maxSlots,
+      availableSlots: t.availableSlots,
+      coordX: t.coordX,
+      coordY: t.coordY,
     })
     setShowForm(true)
   }
 
-  function handleSave() {
-    if (editingTerminal) {
-      setTerminalsList((prev) =>
-        prev.map((t) =>
-          t.id === editingTerminal.id
-            ? {
-                ...t,
-                name: formData.name,
-                max_slots: formData.max_slots,
-                available_slots: Math.min(t.available_slots, formData.max_slots),
-                coordinates: { x: formData.x, y: formData.y },
-              }
-            : t
-        )
-      )
-    } else {
-      const newTerminal: Terminal = {
-        id: `t-${String(terminalsList.length + 1).padStart(3, "0")}`,
-        name: formData.name,
-        status: "ACTIVE",
-        max_slots: formData.max_slots,
-        available_slots: formData.max_slots,
-        coordinates: { x: formData.x, y: formData.y },
-        operators: [],
+  async function handleSave() {
+    setSaving(true)
+    try {
+      if (editingTerminal) {
+        await apiUpdateTerminal(editingTerminal.id, {
+          name: formData.name,
+          maxSlots: formData.maxSlots,
+          availableSlots: Math.min(formData.availableSlots, formData.maxSlots),
+          coordX: formData.coordX,
+          coordY: formData.coordY,
+        })
+      } else {
+        await createTerminal({
+          name: formData.name,
+          maxSlots: formData.maxSlots,
+          availableSlots: formData.availableSlots,
+          coordX: formData.coordX,
+          coordY: formData.coordY,
+        })
       }
-      setTerminalsList((prev) => [...prev, newTerminal])
+      await fetchTerminals()
+      setShowForm(false)
+    } catch (err) {
+      console.error("Failed to save terminal:", err)
+    } finally {
+      setSaving(false)
     }
-    setShowForm(false)
   }
 
-  function toggleStatus(id: string) {
-    setTerminalsList((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? { ...t, status: t.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE" }
-          : t
-      )
-    )
-  }
-
-  function deleteTerminal(id: string) {
-    setTerminalsList((prev) => prev.filter((t) => t.id !== id))
-  }
-
-  function getOperatorNames(opIds: string[]) {
-    return opIds
-      .map((id) => {
-        const op = operators.find((o) => o.id === id)
-        return op ? `${op.first_name} ${op.last_name}` : ""
+  async function toggleStatus(id: string) {
+    const t = terminalsList.find((t) => t.id === id)
+    if (!t) return
+    try {
+      await apiUpdateTerminal(id, {
+        status: t.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE",
       })
-      .filter(Boolean)
-      .join(", ") || "None"
+      await fetchTerminals()
+    } catch (err) {
+      console.error("Failed to toggle status:", err)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      await apiDeleteTerminal(id)
+      await fetchTerminals()
+    } catch (err) {
+      console.error("Failed to delete terminal:", err)
+    }
   }
 
   return (
@@ -153,20 +175,24 @@ export function TerminalList() {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
         <Table>
           <TableHeader>
             <TableRow className="bg-secondary/50 hover:bg-secondary/50">
               <TableHead className="font-heading text-xs font-semibold uppercase tracking-wider text-muted-foreground">Name</TableHead>
               <TableHead className="font-heading text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</TableHead>
               <TableHead className="font-heading text-xs font-semibold uppercase tracking-wider text-muted-foreground">Capacity</TableHead>
-              <TableHead className="font-heading text-xs font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Operators</TableHead>
               <TableHead className="font-heading text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.map((t, index) => {
-              const used = t.max_slots - t.available_slots
-              const percent = Math.round((used / t.max_slots) * 100)
+              const used = t.maxSlots - t.availableSlots
+              const percent = t.maxSlots > 0 ? Math.round((used / t.maxSlots) * 100) : 0
               return (
                 <TableRow key={t.id} className="hover:bg-secondary/30 transition-colors duration-150 animate-fade-in-up" style={{ animationDelay: `${index * 40}ms` }}>
                   <TableCell className="font-medium text-foreground">{t.name}</TableCell>
@@ -190,12 +216,9 @@ export function TerminalList() {
                         className="h-2 w-24"
                       />
                       <span className="text-xs text-muted-foreground">
-                        {used}/{t.max_slots} ({percent}%)
+                        {used}/{t.maxSlots} ({percent}%)
                       </span>
                     </div>
-                  </TableCell>
-                  <TableCell className="hidden text-muted-foreground md:table-cell">
-                    {getOperatorNames(t.operators)}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -219,7 +242,7 @@ export function TerminalList() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-150 rounded-full"
-                        onClick={() => deleteTerminal(t.id)}
+                        onClick={() => handleDelete(t.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -230,6 +253,7 @@ export function TerminalList() {
             })}
           </TableBody>
         </Table>
+        )}
       </div>
 
       {/* Create/Edit Form Modal */}
@@ -248,24 +272,31 @@ export function TerminalList() {
               <Label className="text-foreground">Terminal Name</Label>
               <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="bg-secondary" />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-foreground">Max Slots</Label>
-              <Input type="number" value={formData.max_slots} onChange={(e) => setFormData({ ...formData, max_slots: Number(e.target.value) })} className="bg-secondary" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-foreground">Max Slots</Label>
+                <Input type="number" value={formData.maxSlots} onChange={(e) => setFormData({ ...formData, maxSlots: Number(e.target.value) })} className="bg-secondary" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-foreground">Available Slots</Label>
+                <Input type="number" value={formData.availableSlots} onChange={(e) => setFormData({ ...formData, availableSlots: Number(e.target.value) })} className="bg-secondary" />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label className="text-foreground">Latitude (X)</Label>
-                <Input type="number" step="0.0001" value={formData.x} onChange={(e) => setFormData({ ...formData, x: Number(e.target.value) })} className="bg-secondary" />
+                <Input type="number" step="0.0001" value={formData.coordX} onChange={(e) => setFormData({ ...formData, coordX: Number(e.target.value) })} className="bg-secondary" />
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label className="text-foreground">Longitude (Y)</Label>
-                <Input type="number" step="0.0001" value={formData.y} onChange={(e) => setFormData({ ...formData, y: Number(e.target.value) })} className="bg-secondary" />
+                <Input type="number" step="0.0001" value={formData.coordY} onChange={(e) => setFormData({ ...formData, coordY: Number(e.target.value) })} className="bg-secondary" />
               </div>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowForm(false)} className="hover:bg-secondary transition-colors">Cancel</Button>
-            <Button onClick={handleSave} className="bg-accent text-white hover:bg-accent/90 shadow-md shadow-accent/20 transition-all duration-200 active:scale-95">
+            <Button onClick={handleSave} disabled={saving} className="bg-accent text-white hover:bg-accent/90 shadow-md shadow-accent/20 transition-all duration-200 active:scale-95">
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {editingTerminal ? "Save Changes" : "Create Terminal"}
             </Button>
           </DialogFooter>

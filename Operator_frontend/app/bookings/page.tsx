@@ -1,10 +1,16 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { bookings, terminals, carrierNames, driverNames, BookingStatus } from '@/lib/mock-data'
+import { useState, useMemo, useEffect } from 'react'
 import { Layout } from '@/components/layout'
-import { Booking } from '@/lib/mock-data'
-import { Search, Eye, X, QrCode, Clock, MapPin, Truck, User, Building2, CalendarDays, CheckCircle2, XCircle } from 'lucide-react'
+import {
+  listBookings,
+  listTerminals,
+  approveBooking,
+  rejectBooking,
+  type Booking,
+  type Terminal,
+} from '@/lib/api'
+import { Search, Eye, QrCode, Clock, MapPin, User, Building2, CalendarDays, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -12,22 +18,33 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
+type BookingStatus = 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CONSUMED' | 'CANCELLED'
+
 export default function BookingsPage() {
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [terminals, setTerminals] = useState<Terminal[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | BookingStatus>('all')
-  const [operationFilter, setOperationFilter] = useState<'all' | 'DROP_OFF' | 'PICK_UP'>('all')
-  const [carrierFilter, setCarrierFilter] = useState('all')
-  const [bookingActions, setBookingActions] = useState<Record<string, BookingStatus>>({})
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
 
-  const uniqueCarriers = [...new Set(bookings.map((b) => b.carrier_id))]
+  useEffect(() => {
+    Promise.all([
+      listBookings().catch(() => []),
+      listTerminals().catch(() => []),
+    ]).then(([bk, tm]) => {
+      setBookings(bk as Booking[])
+      setTerminals(tm as Terminal[])
+      setIsLoading(false)
+    })
+  }, [])
 
   const getTerminalName = (terminalId: string) => {
     const terminal = terminals.find(t => t.id === terminalId)
     return terminal ? terminal.name : terminalId
   }
 
-  const formatScheduledAt = (iso: string) => {
+  const formatDate = (iso: string) => {
     const d = new Date(iso)
     return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
   }
@@ -37,43 +54,46 @@ export default function BookingsPage() {
     return d.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
 
-  const formatTimeSlot = (start: string | null, end: string | null) => {
-    if (!start) return '—'
-    return end ? `${start} – ${end}` : start
+  const formatTimeSlot = (start: string, end: string) => {
+    const s = new Date(start).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    const e = new Date(end).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    return `${s} – ${e}`
   }
 
   const filteredBookings = useMemo(() => {
     return bookings.filter((booking) => {
-      const carrierName = (carrierNames[booking.carrier_id] || '').toLowerCase()
-      const driverName = (driverNames[booking.driver_id] || '').toLowerCase()
+      const carrierEmail = (booking.carrier?.email || '').toLowerCase()
+      const driverEmail = (booking.driver?.email || '').toLowerCase()
       const searchMatch =
         booking.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        carrierName.includes(searchTerm.toLowerCase()) ||
-        driverName.includes(searchTerm.toLowerCase())
+        carrierEmail.includes(searchTerm.toLowerCase()) ||
+        driverEmail.includes(searchTerm.toLowerCase())
 
       const statusMatch =
-        statusFilter === 'all' || getBookingStatus(booking) === statusFilter
+        statusFilter === 'all' || booking.status === statusFilter
 
-      const carrierMatch =
-        carrierFilter === 'all' || booking.carrier_id === carrierFilter
-
-      const operationMatch =
-        operationFilter === 'all' || booking.operation_type === operationFilter
-
-      return searchMatch && statusMatch && carrierMatch && operationMatch
+      return searchMatch && statusMatch
     })
-  }, [searchTerm, statusFilter, carrierFilter, operationFilter])
+  }, [bookings, searchTerm, statusFilter])
 
-  const handleConfirm = (bookingId: string) => {
-    setBookingActions((prev) => ({ ...prev, [bookingId]: 'CONFIRMED' }))
+  const handleConfirm = async (bookingId: string) => {
+    try {
+      await approveBooking(bookingId)
+      const updated = await listBookings()
+      setBookings(updated)
+    } catch (err) {
+      console.error('Failed to approve booking:', err)
+    }
   }
 
-  const handleReject = (bookingId: string) => {
-    setBookingActions((prev) => ({ ...prev, [bookingId]: 'REJECTED' }))
-  }
-
-  const getBookingStatus = (booking: Booking): BookingStatus => {
-    return bookingActions[booking.id] || booking.status
+  const handleReject = async (bookingId: string) => {
+    try {
+      await rejectBooking(bookingId)
+      const updated = await listBookings()
+      setBookings(updated)
+    } catch (err) {
+      console.error('Failed to reject booking:', err)
+    }
   }
 
   const getStatusBadge = (status: BookingStatus) => {
@@ -93,22 +113,22 @@ export default function BookingsPage() {
     )
   }
 
-  const getOperationBadge = (type: 'DROP_OFF' | 'PICK_UP') => (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-      type === 'DROP_OFF'
-        ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200'
-        : 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200'
-    }`}>
-      {type === 'DROP_OFF' ? 'Drop Off' : 'Pick Up'}
-    </span>
-  )
-
   const stats = {
-    pending: filteredBookings.filter((b) => getBookingStatus(b) === 'PENDING').length,
-    confirmed: filteredBookings.filter((b) => getBookingStatus(b) === 'CONFIRMED').length,
-    rejected: filteredBookings.filter((b) => getBookingStatus(b) === 'REJECTED').length,
-    consumed: filteredBookings.filter((b) => getBookingStatus(b) === 'CONSUMED').length,
-    cancelled: filteredBookings.filter((b) => getBookingStatus(b) === 'CANCELLED').length,
+    pending: filteredBookings.filter((b) => b.status === 'PENDING').length,
+    confirmed: filteredBookings.filter((b) => b.status === 'CONFIRMED').length,
+    rejected: filteredBookings.filter((b) => b.status === 'REJECTED').length,
+    consumed: filteredBookings.filter((b) => b.status === 'CONSUMED').length,
+    cancelled: filteredBookings.filter((b) => b.status === 'CANCELLED').length,
+  }
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </Layout>
+    )
   }
 
   return (
@@ -140,7 +160,7 @@ export default function BookingsPage() {
 
         {/* Filters */}
         <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="relative">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <input
@@ -163,96 +183,76 @@ export default function BookingsPage() {
               <option value="CONSUMED">Consumed</option>
               <option value="CANCELLED">Cancelled</option>
             </select>
-            <select
-              value={operationFilter}
-              onChange={(e) => setOperationFilter(e.target.value as any)}
-              className="w-full rounded-lg border border-input bg-background px-4 py-2 text-sm font-condensed focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all appearance-none cursor-pointer"
-            >
-              <option value="all">All Operations</option>
-              <option value="DROP_OFF">Drop Off</option>
-              <option value="PICK_UP">Pick Up</option>
-            </select>
-            <select
-              value={carrierFilter}
-              onChange={(e) => setCarrierFilter(e.target.value)}
-              className="w-full rounded-lg border border-input bg-background px-4 py-2 text-sm font-condensed focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all appearance-none cursor-pointer"
-            >
-              <option value="all">All Carriers</option>
-              {uniqueCarriers.map((carrierId) => (
-                <option key={carrierId} value={carrierId}>
-                  {carrierNames[carrierId] || carrierId}
-                </option>
-              ))}
-            </select>
           </div>
         </div>
 
-        {/* Bookings Table — compact columns */}
+        {/* Bookings Table */}
         <div className="rounded-xl border border-border bg-white overflow-hidden shadow-sm">
           <table className="w-full text-sm font-condensed">
             <thead>
               <tr className="border-b border-border bg-slate-50">
                 <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Carrier</th>
+                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Driver</th>
                 <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Terminal</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Operation</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Scheduled</th>
+                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Date</th>
+                <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Time Slot</th>
                 <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
                 <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredBookings.map((booking) => {
-                const status = getBookingStatus(booking)
-                return (
-                  <tr
-                    key={booking.id}
-                    className="border-b border-border/50 transition-colors hover:bg-slate-50/60"
-                  >
-                    <td className="px-5 py-3.5 text-foreground font-medium">
-                      {carrierNames[booking.carrier_id] || booking.carrier_id}
-                    </td>
-                    <td className="px-5 py-3.5 text-muted-foreground">
-                      {getTerminalName(booking.terminal_id)}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      {getOperationBadge(booking.operation_type)}
-                    </td>
-                    <td className="px-5 py-3.5 text-muted-foreground">
-                      {formatScheduledAt(booking.scheduled_at)}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      {getStatusBadge(status)}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-2">
-                        {status === 'PENDING' && (
-                          <>
-                            <button
-                              onClick={() => handleConfirm(booking.id)}
-                              className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-600 transition-all hover:shadow-md active:scale-95"
-                            >
-                              Confirm
-                            </button>
-                            <button
-                              onClick={() => handleReject(booking.id)}
-                              className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-red-600 ring-1 ring-red-200 hover:bg-red-50 transition-all active:scale-95"
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
-                        <button
-                          onClick={() => setSelectedBooking(booking)}
-                          className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-slate-100 transition-all"
-                          title="View details"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
+              {filteredBookings.map((booking) => (
+                <tr
+                  key={booking.id}
+                  className="border-b border-border/50 transition-colors hover:bg-slate-50/60"
+                >
+                  <td className="px-5 py-3.5 text-foreground font-medium">
+                    {booking.carrier?.email || booking.carrierUserId}
+                  </td>
+                  <td className="px-5 py-3.5 text-muted-foreground">
+                    {booking.driver?.email || '—'}
+                  </td>
+                  <td className="px-5 py-3.5 text-muted-foreground">
+                    {getTerminalName(booking.terminalId)}
+                  </td>
+                  <td className="px-5 py-3.5 text-muted-foreground">
+                    {formatDate(booking.date)}
+                  </td>
+                  <td className="px-5 py-3.5 text-muted-foreground">
+                    {formatTimeSlot(booking.startTime, booking.endTime)}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    {getStatusBadge(booking.status)}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-2">
+                      {booking.status === 'PENDING' && (
+                        <>
+                          <button
+                            onClick={() => handleConfirm(booking.id)}
+                            className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-600 transition-all hover:shadow-md active:scale-95"
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            onClick={() => handleReject(booking.id)}
+                            className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-red-600 ring-1 ring-red-200 hover:bg-red-50 transition-all active:scale-95"
+                          >
+                            Reject
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={() => setSelectedBooking(booking)}
+                        className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-slate-100 transition-all"
+                        title="View details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
           {filteredBookings.length === 0 && (
@@ -269,106 +269,90 @@ export default function BookingsPage() {
           <DialogHeader>
             <DialogTitle className="text-lg font-bold">Booking Details</DialogTitle>
           </DialogHeader>
-          {selectedBooking && (() => {
-            const status = getBookingStatus(selectedBooking)
-            return (
-              <div className="space-y-5">
-                {/* Status + Operation header */}
-                <div className="flex items-center gap-3">
-                  {getStatusBadge(status)}
-                  {getOperationBadge(selectedBooking.operation_type)}
-                </div>
+          {selectedBooking && (
+            <div className="space-y-5">
+              {/* Status header */}
+              <div className="flex items-center gap-3">
+                {getStatusBadge(selectedBooking.status)}
+              </div>
 
-                {/* Info grid */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <Building2 className="h-3.5 w-3.5" /> Carrier
-                    </p>
-                    <p className="text-sm font-medium text-foreground">{carrierNames[selectedBooking.carrier_id] || selectedBooking.carrier_id}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <User className="h-3.5 w-3.5" /> Driver
-                    </p>
-                    <p className="text-sm font-medium text-foreground">{driverNames[selectedBooking.driver_id] || selectedBooking.driver_id}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <MapPin className="h-3.5 w-3.5" /> Terminal
-                    </p>
-                    <p className="text-sm font-medium text-foreground">{getTerminalName(selectedBooking.terminal_id)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <CalendarDays className="h-3.5 w-3.5" /> Scheduled At
-                    </p>
-                    <p className="text-sm font-medium text-foreground">{formatDateTime(selectedBooking.scheduled_at)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5" /> Time Slot
-                    </p>
-                    <p className="text-sm font-medium text-foreground">{formatTimeSlot(selectedBooking.time_start, selectedBooking.time_end)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <QrCode className="h-3.5 w-3.5" /> QR Notified
-                    </p>
-                    <p className="text-sm font-medium text-foreground">{selectedBooking.qr_notified ? 'Yes' : 'No'}</p>
-                  </div>
+              {/* Info grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5" /> Carrier
+                  </p>
+                  <p className="text-sm font-medium text-foreground">{selectedBooking.carrier?.email || selectedBooking.carrierUserId}</p>
                 </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5" /> Driver
+                  </p>
+                  <p className="text-sm font-medium text-foreground">{selectedBooking.driver?.email || '—'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5" /> Terminal
+                  </p>
+                  <p className="text-sm font-medium text-foreground">{getTerminalName(selectedBooking.terminalId)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <CalendarDays className="h-3.5 w-3.5" /> Date
+                  </p>
+                  <p className="text-sm font-medium text-foreground">{formatDate(selectedBooking.date)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5" /> Time Slot
+                  </p>
+                  <p className="text-sm font-medium text-foreground">{formatTimeSlot(selectedBooking.startTime, selectedBooking.endTime)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <QrCode className="h-3.5 w-3.5" /> QR Payload
+                  </p>
+                  <p className="text-sm font-medium text-foreground">{selectedBooking.qrPayload || '—'}</p>
+                </div>
+              </div>
 
-                {/* Additional details */}
-                <div className="space-y-3 rounded-lg bg-slate-50 p-4">
+              {/* Additional details */}
+              <div className="space-y-3 rounded-lg bg-slate-50 p-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Booking ID</span>
+                  <span className="font-mono text-xs text-foreground select-all">{selectedBooking.id}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Created At</span>
+                  <span className="text-foreground">{formatDateTime(selectedBooking.createdAt)}</span>
+                </div>
+                {selectedBooking.decidedByOperatorUserId && (
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Booking ID</span>
-                    <span className="font-mono text-xs text-foreground select-all">{selectedBooking.id}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Created At</span>
-                    <span className="text-foreground">{formatDateTime(selectedBooking.created_at)}</span>
-                  </div>
-                  {selectedBooking.decided_by_operator_user_id && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Decided By</span>
-                      <span className="text-foreground">{selectedBooking.decided_by_operator_user_id}</span>
-                    </div>
-                  )}
-                  {selectedBooking.reject_reason && (
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Reject Reason</span>
-                      <p className="mt-1 text-red-600 font-medium">{selectedBooking.reject_reason}</p>
-                    </div>
-                  )}
-                  {selectedBooking.qr_payload && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">QR Payload</span>
-                      <span className="font-mono text-xs text-foreground">{selectedBooking.qr_payload}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Action buttons in dialog */}
-                {status === 'PENDING' && (
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      onClick={() => { handleConfirm(selectedBooking.id); setSelectedBooking(null) }}
-                      className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-600 transition-all hover:shadow-md active:scale-[0.98]"
-                    >
-                      <CheckCircle2 className="h-4 w-4" /> Confirm Booking
-                    </button>
-                    <button
-                      onClick={() => { handleReject(selectedBooking.id); setSelectedBooking(null) }}
-                      className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-red-600 ring-1 ring-red-200 hover:bg-red-50 transition-all active:scale-[0.98]"
-                    >
-                      <XCircle className="h-4 w-4" /> Reject Booking
-                    </button>
+                    <span className="text-muted-foreground">Decided By</span>
+                    <span className="text-foreground">{selectedBooking.decidedByOperatorUserId}</span>
                   </div>
                 )}
               </div>
-            )
-          })()}
+
+              {/* Action buttons in dialog */}
+              {selectedBooking.status === 'PENDING' && (
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => { handleConfirm(selectedBooking.id); setSelectedBooking(null) }}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-600 transition-all hover:shadow-md active:scale-[0.98]"
+                  >
+                    <CheckCircle2 className="h-4 w-4" /> Confirm Booking
+                  </button>
+                  <button
+                    onClick={() => { handleReject(selectedBooking.id); setSelectedBooking(null) }}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-red-600 ring-1 ring-red-200 hover:bg-red-50 transition-all active:scale-[0.98]"
+                  >
+                    <XCircle className="h-4 w-4" /> Reject Booking
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </Layout>

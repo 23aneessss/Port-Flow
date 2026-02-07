@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { useAppStore } from "@/lib/store"
 import type { Driver, Booking } from "@/lib/data"
 import {
@@ -35,38 +36,46 @@ import {
   CircleX,
   TrendingUp,
   Container,
+  Loader2,
 } from "lucide-react"
 
 const statusColors: Record<string, string> = {
-  Pending: "#f59e0b",
-  Confirmed: "#22c55e",
-  Rejected: "#ef4444",
-  Consumed: "#38BDF8",
-  Cancelled: "#64748B",
+  PENDING: "#f59e0b",
+  CONFIRMED: "#22c55e",
+  REJECTED: "#ef4444",
+  CONSUMED: "#38BDF8",
+  CANCELLED: "#64748B",
 }
 
 export default function DashboardPage() {
-  const { drivers, bookings } = useAppStore()
+  const { drivers, bookings, terminals, fetchDrivers, fetchBookings, fetchTerminals, isLoadingDrivers, isLoadingBookings } = useAppStore()
+
+  useEffect(() => {
+    fetchDrivers()
+    fetchBookings()
+    fetchTerminals()
+  }, [])
 
   const totalDrivers = drivers.length
-  const activeDrivers = drivers.filter((d: Driver) => d.status === "Active").length
+  const activeDrivers = drivers.filter((d: Driver) => d.status === "ACTIVE").length
   const totalBookings = bookings.length
-  const pendingBookings = bookings.filter((b: Booking) => b.status === "Pending").length
-  const confirmedBookings = bookings.filter((b: Booking) => b.status === "Confirmed").length
-  const rejectedBookings = bookings.filter((b: Booking) => b.status === "Rejected").length
+  const pendingBookings = bookings.filter((b: Booking) => b.status === "PENDING").length
+  const confirmedBookings = bookings.filter((b: Booking) => b.status === "CONFIRMED").length
+  const rejectedBookings = bookings.filter((b: Booking) => b.status === "REJECTED").length
 
   const statusData = [
-    { name: "Pending", value: bookings.filter((b: Booking) => b.status === "Pending").length, fill: statusColors.Pending },
-    { name: "Confirmed", value: bookings.filter((b: Booking) => b.status === "Confirmed").length, fill: statusColors.Confirmed },
-    { name: "Rejected", value: bookings.filter((b: Booking) => b.status === "Rejected").length, fill: statusColors.Rejected },
-    { name: "Consumed", value: bookings.filter((b: Booking) => b.status === "Consumed").length, fill: statusColors.Consumed },
-    { name: "Cancelled", value: bookings.filter((b: Booking) => b.status === "Cancelled").length, fill: statusColors.Cancelled },
+    { name: "Pending", value: bookings.filter((b: Booking) => b.status === "PENDING").length, fill: statusColors.PENDING },
+    { name: "Confirmed", value: bookings.filter((b: Booking) => b.status === "CONFIRMED").length, fill: statusColors.CONFIRMED },
+    { name: "Rejected", value: bookings.filter((b: Booking) => b.status === "REJECTED").length, fill: statusColors.REJECTED },
+    { name: "Consumed", value: bookings.filter((b: Booking) => b.status === "CONSUMED").length, fill: statusColors.CONSUMED },
+    { name: "Cancelled", value: bookings.filter((b: Booking) => b.status === "CANCELLED").length, fill: statusColors.CANCELLED },
   ].filter((d) => d.value > 0)
 
   const terminalMap: Record<string, number> = {}
   for (const b of bookings) {
-    const short = b.terminalName.split(" - ")[0]
-    terminalMap[short] = (terminalMap[short] || 0) + 1
+    const t = terminals.find(t => t.id === b.terminalId)
+    const name = t ? t.name : b.terminalId
+    terminalMap[name] = (terminalMap[name] || 0) + 1
   }
   const terminalData = Object.entries(terminalMap).map(([name, count]) => ({
     name,

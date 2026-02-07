@@ -1,3 +1,5 @@
+"use client"
+
 import { AdminHeader } from "@/components/admin-header"
 import { KpiCards } from "@/components/dashboard/kpi-cards"
 import { TerminalUtilizationChart } from "@/components/dashboard/terminal-utilization-chart"

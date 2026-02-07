@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AdminHeader } from "@/components/admin-header"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -18,8 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { AlertTriangle, AlertCircle, Info, Clock, Building2, ChevronRight } from "lucide-react"
-import { anomalies, type Anomaly } from "@/lib/mock-data"
+import { AlertTriangle, AlertCircle, Info, Clock, Building2, ChevronRight, Loader2 } from "lucide-react"
+import { listAnomalies, type Anomaly } from "@/lib/api"
 
 function getSeverityConfig(severity: string) {
   switch (severity) {
@@ -45,9 +45,18 @@ function getSeverityConfig(severity: string) {
 }
 
 export default function AnomaliesPage() {
+  const [anomalies, setAnomalies] = useState<Anomaly[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [severityFilter, setSeverityFilter] = useState<string>("ALL")
   const [selectedAnomaly, setSelectedAnomaly] = useState<Anomaly | null>(null)
   const [showDetail, setShowDetail] = useState(false)
+
+  useEffect(() => {
+    listAnomalies()
+      .then(setAnomalies)
+      .catch((err) => console.error("Failed to load anomalies:", err))
+      .finally(() => setIsLoading(false))
+  }, [])
 
   const filtered = anomalies.filter((a) =>
     severityFilter === "ALL" || a.severity === severityFilter
@@ -115,15 +124,20 @@ export default function AnomaliesPage() {
           </div>
 
           {/* Anomaly Cards */}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
           <div className="flex flex-col gap-3">
-            {filtered.map((a) => {
+            {filtered.map((a, idx) => {
               const config = getSeverityConfig(a.severity)
               const SeverityIcon = config.icon
               return (
                 <Card
                   key={a.id}
                   className={`cursor-pointer border-l-4 bg-card transition-all duration-200 hover:bg-secondary/30 hover:shadow-md ${config.bgCard} animate-fade-in-up`}
-                  style={{ animationDelay: `${filtered.indexOf(a) * 60}ms` }}
+                  style={{ animationDelay: `${idx * 60}ms` }}
                   onClick={() => { setSelectedAnomaly(a); setShowDetail(true) }}
                 >
                   <CardContent className="flex items-center gap-4 p-4">
@@ -132,24 +146,20 @@ export default function AnomaliesPage() {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-foreground">{a.title}</h3>
+                        <h3 className="text-sm font-semibold text-foreground">{a.message}</h3>
                         <Badge variant="outline" className={config.classes}>
                           <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${a.severity === "CRITICAL" ? "bg-destructive animate-pulse" : a.severity === "WARNING" ? "bg-warning" : "bg-accent"}`} />
                           {a.severity}
-                        </Badge>
-                        <Badge variant="outline" className={a.status === "OPEN" ? "border-destructive/20 bg-destructive/5 text-destructive" : "border-muted-foreground/20 bg-muted text-muted-foreground"}>
-                          <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${a.status === "OPEN" ? "bg-destructive animate-pulse" : "bg-muted-foreground"}`} />
-                          {a.status}
                         </Badge>
                       </div>
                       <div className="mt-1 flex items-center gap-4 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Building2 className="h-3 w-3" />
-                          {a.terminal_name}
+                          {a.terminal?.name || "Unknown"}
                         </span>
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          {new Date(a.timestamp).toLocaleString()}
+                          {new Date(a.createdAt).toLocaleString()}
                         </span>
                       </div>
                     </div>
@@ -159,6 +169,7 @@ export default function AnomaliesPage() {
               )
             })}
           </div>
+          )}
         </div>
 
         {/* Detail Modal */}
@@ -173,12 +184,10 @@ export default function AnomaliesPage() {
             {selectedAnomaly && (
               <div className="flex flex-col gap-3">
                 {[
-                  ["Title", selectedAnomaly.title],
-                  ["Description", selectedAnomaly.description],
-                  ["Terminal", selectedAnomaly.terminal_name],
+                  ["Message", selectedAnomaly.message],
+                  ["Terminal", selectedAnomaly.terminal?.name || "Unknown"],
                   ["Severity", selectedAnomaly.severity],
-                  ["Status", selectedAnomaly.status],
-                  ["Timestamp", new Date(selectedAnomaly.timestamp).toLocaleString()],
+                  ["Date", new Date(selectedAnomaly.createdAt).toLocaleString()],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-lg bg-secondary/50 px-4 py-2.5">
                     <span className="text-xs text-muted-foreground">{label}</span>

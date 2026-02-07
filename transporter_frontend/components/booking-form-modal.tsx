@@ -21,16 +21,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { Booking, OperationType } from "@/lib/data"
-import { terminals } from "@/lib/data"
+import type { Booking, TerminalOption } from "@/lib/data"
 import type { Driver } from "@/lib/data"
 
 interface BookingFormModalProps {
   open: boolean
   onClose: () => void
-  onSubmit: (data: Omit<Booking, "id">) => void
+  onSubmit: (data: any) => void
   initialData?: Booking | null
   drivers: Driver[]
+  terminals: TerminalOption[]
 }
 
 export function BookingFormModal({
@@ -39,38 +39,39 @@ export function BookingFormModal({
   onSubmit,
   initialData,
   drivers,
+  terminals,
 }: BookingFormModalProps) {
-  const [terminalName, setTerminalName] = useState("")
-  const [driverId, setDriverId] = useState("")
-  const [operationType, setOperationType] = useState<OperationType>("Pick-up")
+  const [terminalId, setTerminalId] = useState("")
+  const [driverUserId, setDriverUserId] = useState("")
   const [date, setDate] = useState("")
-  const [time, setTime] = useState("")
+  const [startTime, setStartTime] = useState("")
+  const [endTime, setEndTime] = useState("")
 
   useEffect(() => {
     if (initialData) {
-      setTerminalName(initialData.terminalName)
-      setDriverId(initialData.driverId)
-      setOperationType(initialData.operationType)
-      setDate(initialData.date)
-      setTime(initialData.time)
+      setTerminalId(initialData.terminalId)
+      setDriverUserId(initialData.driverUserId || "")
+      setDate(initialData.date ? initialData.date.split("T")[0] : "")
+      setStartTime(initialData.startTime ? new Date(initialData.startTime).toTimeString().slice(0, 5) : "")
+      setEndTime(initialData.endTime ? new Date(initialData.endTime).toTimeString().slice(0, 5) : "")
     } else {
-      setTerminalName("")
-      setDriverId("")
-      setOperationType("Pick-up")
+      setTerminalId("")
+      setDriverUserId("")
       setDate("")
-      setTime("")
+      setStartTime("")
+      setEndTime("")
     }
   }, [initialData, open])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const dateStr = date
     onSubmit({
-      terminalName,
-      driverId,
-      operationType,
-      date,
-      time,
-      status: initialData?.status || "Pending",
+      terminalId,
+      date: dateStr,
+      startTime: `${dateStr}T${startTime}:00.000Z`,
+      endTime: `${dateStr}T${endTime}:00.000Z`,
+      driverUserId: driverUserId || undefined,
     })
     onClose()
   }
@@ -85,73 +86,69 @@ export function BookingFormModal({
           <DialogDescription>
             {initialData
               ? "Update the booking details below."
-              : "Create a new terminal booking for a driver."}
+              : "Create a new terminal booking."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="terminal">Terminal Name</Label>
-            <Select value={terminalName} onValueChange={setTerminalName} required>
+            <Label htmlFor="terminal">Terminal</Label>
+            <Select value={terminalId} onValueChange={setTerminalId} required>
               <SelectTrigger>
                 <SelectValue placeholder="Select terminal" />
               </SelectTrigger>
               <SelectContent>
                 {terminals.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="driver">Driver</Label>
-            <Select value={driverId} onValueChange={setDriverId} required>
+            <Label htmlFor="driver">Driver (optional)</Label>
+            <Select value={driverUserId} onValueChange={setDriverUserId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select driver" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="none">No driver</SelectItem>
                 {drivers.map((d) => (
-                  <SelectItem key={d.id} value={d.id}>
-                    {d.fullName}
+                  <SelectItem key={d.userId} value={d.userId}>
+                    {d.firstName} {d.lastName}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="opType">Operation Type</Label>
-            <Select
-              value={operationType}
-              onValueChange={(v) => setOperationType(v as OperationType)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Pick-up">Pick-up</SelectItem>
-                <SelectItem value="Drop-off">Drop-off</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label htmlFor="date">Date</Label>
+            <Input
+              id="date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              required
+            />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="date">Date</Label>
+              <Label htmlFor="startTime">Start Time</Label>
               <Input
-                id="date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
+                id="startTime"
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
                 required
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="time">Time</Label>
+              <Label htmlFor="endTime">End Time</Label>
               <Input
-                id="time"
+                id="endTime"
                 type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
                 required
               />
             </div>

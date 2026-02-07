@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import {
   BarChart,
   Bar,
@@ -11,13 +12,8 @@ import {
   Cell,
 } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { terminals } from "@/lib/mock-data"
-
-const data = terminals.map((t) => ({
-  name: t.name.replace("Terminal ", ""),
-  usage: Math.round(((t.max_slots - t.available_slots) / t.max_slots) * 100),
-  status: t.status,
-}))
+import { listTerminals, type Terminal } from "@/lib/api"
+import { Loader2 } from "lucide-react"
 
 function getBarColor(usage: number, status: string) {
   if (status === "SUSPENDED") return "hsl(215, 16%, 47%)"
@@ -27,6 +23,24 @@ function getBarColor(usage: number, status: string) {
 }
 
 export function CapacityChart() {
+  const [data, setData] = useState<{ name: string; usage: number; status: string }[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    listTerminals()
+      .then((terminals) => {
+        setData(
+          terminals.map((t) => ({
+            name: t.name.replace("Terminal ", ""),
+            usage: t.maxSlots > 0 ? Math.round(((t.maxSlots - t.availableSlots) / t.maxSlots) * 100) : 0,
+            status: t.status,
+          }))
+        )
+      })
+      .catch((err) => console.error("Failed to load terminals:", err))
+      .finally(() => setIsLoading(false))
+  }, [])
+
   return (
     <Card className="border-border bg-card hover:shadow-lg hover:shadow-accent/5 transition-all duration-300 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
       <CardHeader className="pb-2">
@@ -35,6 +49,11 @@ export function CapacityChart() {
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {isLoading ? (
+          <div className="flex h-80 items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ bottom: 30 }}>
@@ -74,6 +93,7 @@ export function CapacityChart() {
             </BarChart>
           </ResponsiveContainer>
         </div>
+        )}
       </CardContent>
     </Card>
   )
