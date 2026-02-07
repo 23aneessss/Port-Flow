@@ -46,7 +46,9 @@ Base URL: `http://localhost:4000`
 
 ## Driver (DRIVER)
 - `GET /driver/bookings/mine`
+- `GET /driver/history`
 - `GET /driver/bookings/:id/qr`
+- `GET /driver/profile`
 - `GET /driver/notifications`
 - `POST /driver/notifications/:id/read`
 

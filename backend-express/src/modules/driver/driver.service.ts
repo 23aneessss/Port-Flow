@@ -1,11 +1,99 @@
 import { prisma } from '../../config/db.js';
 import { generateQrPayload } from '../../utils/qr.js';
 import { isSameDate, minutesBefore } from '../../utils/time.js';
-import { NotificationType } from '@prisma/client';
+import { BookingStatus, NotificationType } from '@prisma/client';
 import { auditLog } from '../../utils/audit.js';
 
+const bookingInclude = {
+  terminal: {
+    select: {
+      id: true,
+      name: true
+    }
+  },
+  carrier: {
+    select: {
+      id: true,
+      carrierProfile: {
+        select: {
+          companyName: true
+        }
+      }
+    }
+  },
+  driver: {
+    select: {
+      id: true,
+      email: true,
+      driverProfile: {
+        select: {
+          firstName: true,
+          lastName: true,
+          phone: true,
+          truckNumber: true,
+          truckPlate: true
+        }
+      }
+    }
+  }
+} as const;
+
 export async function listMyBookings(driverUserId: string) {
-  return prisma.booking.findMany({ where: { driverUserId } });
+  return prisma.booking.findMany({
+    where: { driverUserId },
+    include: bookingInclude,
+    orderBy: { startTime: 'asc' }
+  });
+}
+
+export async function listMyHistory(driverUserId: string) {
+  return prisma.booking.findMany({
+    where: {
+      driverUserId,
+      status: BookingStatus.CONSUMED
+    },
+    include: bookingInclude,
+    orderBy: { startTime: 'desc' }
+  });
+}
+
+export async function getMyProfile(driverUserId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: driverUserId },
+    include: {
+      driverProfile: {
+        include: {
+          carrier: {
+            select: {
+              id: true,
+              carrierProfile: {
+                select: {
+                  companyName: true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (!user || !user.driverProfile) throw new Error('Driver profile not found');
+
+  const profile = user.driverProfile;
+  return {
+    id: user.id,
+    email: user.email,
+    firstName: profile.firstName,
+    lastName: profile.lastName,
+    phone: profile.phone,
+    transporterId: profile.carrierUserId,
+    transporterName: profile.carrier.carrierProfile?.companyName ?? 'Transporteur',
+    truckNumber: profile.truckNumber,
+    truckPlate: profile.truckPlate,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt
+  };
 }
 
 export async function getBookingQr(driverUserId: string, bookingId: string) {

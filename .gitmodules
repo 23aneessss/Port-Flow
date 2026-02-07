@@ -1,0 +1,3 @@
+[submodule "Mobile-Driver"]
+  path = Mobile-Driver
+  url = https://example.invalid/Mobile-Driver.git
