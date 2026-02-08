@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "PORT FLOW DRIVER",
+    "slug": "port-flow-driver",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./src/assets/LOGO.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./src/assets/LOGO.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F172A"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.portflow.driver"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./src/assets/LOGO.png",
+        "backgroundColor": "#0F172A"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.portflow.driver"
+    },
+    "web": {
+      "favicon": "./src/assets/LOGO.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "port-flow-driver"
+      }
+    }
+  }
+}
